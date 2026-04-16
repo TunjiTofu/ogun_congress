@@ -118,8 +118,59 @@ class RegistrationController extends Controller
             ->where('status', \App\Enums\CodeStatus::CLAIMED)
             ->firstOrFail();
 
-        $camper = $registrationCode->camper()->with(['church.district'])->firstOrFail();
+        $camper = $registrationCode->camper()->with(['church.district', 'contacts'])->firstOrFail();
 
         return view('registration.success', compact('camper', 'registrationCode'));
+    }
+
+    /**
+     * POST /registration/validate (web form)
+     *
+     * Validates the code and redirects to the registration wizard.
+     */
+    public function validateCodeWeb(\Illuminate\Http\Request $request)
+    {
+        $request->validate(['code' => ['required', 'string']]);
+
+        try {
+            $this->registrationService->validateCode($request->input('code'));
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withInput()
+                ->with('error', $e->validator->errors()->first('code'));
+        }
+
+        return redirect()->route('registration.form', ['code' => $request->input('code')]);
+    }
+
+    /**
+     * GET /registration/form/{code}
+     *
+     * Shows the multi-step registration wizard.
+     */
+    public function form(string $code)
+    {
+        try {
+            $prefill = $this->registrationService->validateCode($code);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->route('registration.index')
+                ->with('error', $e->validator->errors()->first('code'));
+        }
+
+        $districts = \App\Models\District::orderBy('name')->get();
+
+        return view('registration.form', compact('code', 'prefill', 'districts'));
+    }
+
+    /**
+     * POST /registration/submit (web form)
+     *
+     * Handles the full multi-step form submission from the browser.
+     */
+    public function submitWeb(\App\Http\Requests\SubmitRegistrationRequest $request)
+    {
+        $camper = $this->registrationService->submit($request->validated());
+
+        return redirect()->route('registration.success', ['code' => $camper->camper_number]);
     }
 }

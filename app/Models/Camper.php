@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CamperCategory;
 use App\Enums\Gender;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,6 +22,8 @@ class Camper extends Model implements HasMedia
     use InteractsWithMedia;
     use LogsActivity;
     use SoftDeletes;
+
+    use HasFactory;
 
     protected $fillable = [
         'registration_code_id',

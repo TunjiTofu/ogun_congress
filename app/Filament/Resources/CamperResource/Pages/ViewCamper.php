@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\CamperResource\Pages;
 
 use App\Filament\Resources\CamperResource;
-use App\Enums\CamperCategory;
 use Filament\Actions;
 use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\Group;
@@ -11,38 +10,7 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
-use Filament\Resources\Pages\ListRecords\Tab;
 use Filament\Resources\Pages\ViewRecord;
-use Illuminate\Database\Eloquent\Builder;
-
-class ListCampers extends ListRecords
-{
-    protected static string $resource = CamperResource::class;
-
-    protected function getHeaderActions(): array
-    {
-        return []; // Campers are created via registration only
-    }
-
-    public function getTabs(): array
-    {
-        return [
-            'all'         => Tab::make('All'),
-            'adventurers' => Tab::make('Adventurers')
-                ->modifyQueryUsing(fn (Builder $q) => $q->where('category', CamperCategory::ADVENTURER))
-                ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::ADVENTURER)->count()),
-            'pathfinders' => Tab::make('Pathfinders')
-                ->modifyQueryUsing(fn (Builder $q) => $q->where('category', CamperCategory::PATHFINDER))
-                ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::PATHFINDER)->count()),
-            'senior_youth'=> Tab::make('Senior Youth')
-                ->modifyQueryUsing(fn (Builder $q) => $q->where('category', CamperCategory::SENIOR_YOUTH))
-                ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::SENIOR_YOUTH)->count()),
-        ];
-    }
-}
 
 class ViewCamper extends ViewRecord
 {
@@ -50,9 +18,7 @@ class ViewCamper extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            Actions\EditAction::make(),
-        ];
+        return [Actions\EditAction::make()];
     }
 
     public function infolist(Infolist $infolist): Infolist
@@ -80,10 +46,20 @@ class ViewCamper extends ViewRecord
                 ->columns(3)
                 ->schema([
                     TextEntry::make('date_of_birth')->label('Date of Birth')->date(),
-                    TextEntry::make('age')->label('Age')->getStateUsing(fn ($record) => $record->age . ' years'),
-                    TextEntry::make('gender')->label('Gender')->formatStateUsing(fn ($state) => $state?->label()),
-                    TextEntry::make('category')->label('Category')->formatStateUsing(fn ($state) => $state?->label())->badge(),
-                    TextEntry::make('home_address')->label('Address')->columnSpanFull()->placeholder('Not provided'),
+                    TextEntry::make('age')
+                        ->label('Age')
+                        ->getStateUsing(fn ($record) => $record->age . ' years'),
+                    TextEntry::make('gender')
+                        ->label('Gender')
+                        ->formatStateUsing(fn ($state) => $state?->label()),
+                    TextEntry::make('category')
+                        ->label('Category')
+                        ->formatStateUsing(fn ($state) => $state?->label())
+                        ->badge(),
+                    TextEntry::make('home_address')
+                        ->label('Address')
+                        ->columnSpanFull()
+                        ->placeholder('Not provided'),
                 ]),
 
             Section::make('Church & Ministry')
@@ -136,27 +112,4 @@ class ViewCamper extends ViewRecord
                 ]),
         ]);
     }
-}
-
-class EditCamper extends EditRecord
-{
-    protected static string $resource = CamperResource::class;
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            Actions\ViewAction::make(),
-            Actions\DeleteAction::make(),
-        ];
-    }
-
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('view', ['record' => $this->record]);
-    }
-}
-
-class CreateCamper extends CreateRecord
-{
-    protected static string $resource = CamperResource::class;
 }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\OfflinePaymentStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -12,6 +13,8 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class OfflinePayment extends Model
 {
     use LogsActivity;
+
+    use HasFactory;
 
     protected $fillable = [
         'submitted_name',

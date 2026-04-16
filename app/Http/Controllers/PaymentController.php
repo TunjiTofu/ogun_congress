@@ -65,12 +65,37 @@ class PaymentController extends Controller
     }
 
     /**
-     * POST /api/webhooks/paystack
+     * POST /registration/pay-online (web form)
      *
-     * Receives Paystack webhook events.
-     * Responds 200 immediately and processes in queue — never blocks.
-     * Excluded from CSRF middleware in bootstrap/app.php.
+     * Handles the online payment initiation from the browser pay-online form.
+     * On success, redirects to Paystack. On failure, returns back with errors.
      */
+    public function initiateWeb(\App\Http\Requests\InitiatePaymentRequest $request)
+    {
+        $category    = CamperCategory::from($request->validated('category'));
+        $amountNaira = (int) setting("fee_{$category->value}", 5000);
+
+        try {
+            $result = $this->paymentService->initiatePaystackPayment(
+                name:        $request->validated('name'),
+                phone:       $request->validated('phone'),
+                amountNaira: $amountNaira,
+            );
+        } catch (\Throwable $e) {
+            return back()->withInput()->withErrors([
+                'general' => 'Could not connect to the payment gateway. Please try again.',
+            ]);
+        }
+
+        return redirect()->away($result['authorization_url']);
+    }
+
+    /*
+    *
+    * Receives Paystack webhook events.
+    * Responds 200 immediately and processes in queue — never blocks.
+    * Excluded from CSRF middleware in bootstrap/app.php.
+    */
     public function webhook(Request $request): JsonResponse
     {
         $payload   = $request->getContent();

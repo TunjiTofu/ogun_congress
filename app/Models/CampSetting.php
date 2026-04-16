@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class CampSetting extends Model
 {
@@ -15,8 +16,12 @@ class CampSetting extends Model
 
     protected static function booted(): void
     {
-        // Clear the Redis cache for this key whenever the value is updated
-        static::saved(fn (CampSetting $s) => clear_setting_cache($s->key));
-        static::deleted(fn (CampSetting $s) => clear_setting_cache($s->key));
+        // Inline the cache clearing so this model works even before
+        // helpers.php is autoloaded (e.g. during seeding).
+        $clearCache = fn (CampSetting $s) =>
+        Cache::forget("camp_setting:{$s->key}");
+
+        static::saved($clearCache);
+        static::deleted($clearCache);
     }
 }

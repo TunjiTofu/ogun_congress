@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Enums\CheckinEventType;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CheckinEvent extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'uuid',
         'camper_id',
