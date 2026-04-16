@@ -10,11 +10,12 @@ use App\Services\RegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class RegistrationController extends Controller
 {
     public function __construct(
-        private readonly RegistrationService      $registrationService,
+        private readonly RegistrationService $registrationService,
         private readonly DocumentGenerationService $documentService,
     ) {}
 
@@ -128,13 +129,13 @@ class RegistrationController extends Controller
      *
      * Validates the code and redirects to the registration wizard.
      */
-    public function validateCodeWeb(\Illuminate\Http\Request $request)
+    public function validateCodeWeb(Request $request)
     {
         $request->validate(['code' => ['required', 'string']]);
 
         try {
             $this->registrationService->validateCode($request->input('code'));
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return back()
                 ->withInput()
                 ->with('error', $e->validator->errors()->first('code'));
@@ -152,7 +153,7 @@ class RegistrationController extends Controller
     {
         try {
             $prefill = $this->registrationService->validateCode($code);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return redirect()->route('registration.index')
                 ->with('error', $e->validator->errors()->first('code'));
         }
