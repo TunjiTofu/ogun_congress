@@ -28,19 +28,23 @@ class GenerateCamperDocumentsJob implements ShouldQueue
         $camper = Camper::with(['church.district', 'registrationCode'])
             ->findOrFail($this->camperId);
 
-        Log::info("GenerateCamperDocumentsJob: generating documents for [{$camper->camper_number}]");
-
         $documentService->generateIdCard($camper);
 
         if ($camper->requiresConsentForm()) {
             $documentService->generateConsentForm($camper);
         }
 
-        Log::info("GenerateCamperDocumentsJob: done for [{$camper->camper_number}]");
+        Log::info('docs.generated', [
+            'camper_number' => $camper->camper_number,
+            'consent_form'  => $camper->requiresConsentForm(),
+        ]);
     }
 
     public function failed(\Throwable $exception): void
     {
-        Log::error("GenerateCamperDocumentsJob failed for camper [{$this->camperId}]: " . $exception->getMessage());
+        Log::error('docs.generation_failed', [
+            'camper_id' => $this->camperId,
+            'error'     => $exception->getMessage(),
+        ]);
     }
 }

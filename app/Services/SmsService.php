@@ -31,9 +31,15 @@ class SmsService
 
             $this->log($phone, $message, $trigger, 'sent', $response);
 
+            Log::info('sms.sent', ['trigger' => $trigger, 'phone' => $phone]);
+
             return true;
         } catch (\Throwable $e) {
-            Log::error("SMS send failed [{$trigger}] to [{$phone}]: " . $e->getMessage());
+            Log::error('sms.failed', [
+                'trigger' => $trigger,
+                'phone'   => $phone,
+                'error'   => $e->getMessage(),
+            ]);
             $this->log($phone, $message, $trigger, 'failed', $e->getMessage());
 
             return false;

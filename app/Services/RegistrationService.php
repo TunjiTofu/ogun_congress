@@ -14,6 +14,7 @@ use App\Models\Church;
 use App\Models\RegistrationCode;
 use App\Repositories\Interfaces\RegistrationCodeRepositoryInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -34,12 +35,17 @@ class RegistrationService
         $registrationCode = $this->codeRepository->findByCode($code);
 
         if (! $registrationCode) {
+            Log::warning('registration.invalid_code', ['code' => $code]);
             throw ValidationException::withMessages([
                 'code' => 'This code is not recognised. Please check and try again, or contact the secretariat.',
             ]);
         }
 
         if ($registrationCode->status !== CodeStatus::ACTIVE) {
+            Log::warning('registration.code_not_active', [
+                'code'   => $code,
+                'status' => $registrationCode->status->value,
+            ]);
             throw ValidationException::withMessages([
                 'code' => $registrationCode->status->userMessage(),
             ]);
@@ -103,25 +109,20 @@ class RegistrationService
                 'church_id'            => $data['church_id'],
                 'ministry'             => $data['ministry'] ?? null,
                 'club_rank'            => $data['club_rank'] ?? null,
-                'volunteer_role'       => $data['volunteer_role'] ?? null,
             ]);
 
             // ── 4. Attach photo via Spatie MediaLibrary ───────────────────────
             if (! empty($data['photo'])) {
                 $camper->addMedia($data['photo'])
-                       ->toMediaCollection('photo');
+                    ->toMediaCollection('photo');
             }
 
-            // ── 5. Create health record (always, even if all fields are empty) ─
+            // ── 5. Create health record (always, even if all fields empty) ──────
             CamperHealth::create([
-                'camper_id'           => $camper->id,
-                'medical_conditions'  => $data['medical_conditions'] ?? null,
-                'medications'         => $data['medications'] ?? null,
-                'allergies'           => $data['allergies'] ?? null,
-                'dietary_restrictions'=> $data['dietary_restrictions'] ?? null,
-                'doctor_name'         => $data['doctor_name'] ?? null,
-                'doctor_phone'        => $data['doctor_phone'] ?? null,
-                'insurance_details'   => $data['insurance_details'] ?? null,
+                'camper_id'          => $camper->id,
+                'medical_conditions' => $data['medical_conditions'] ?? null,
+                'medications'        => $data['medications'] ?? null,
+                'allergies'          => $data['allergies'] ?? null,
             ]);
 
             // ── 6. Create parent/guardian contact (Adventurers & Pathfinders) ─
@@ -137,24 +138,19 @@ class RegistrationService
                 ]);
             }
 
-            // ── 7. Create emergency contact ───────────────────────────────────
-            CamperContact::create([
-                'camper_id'    => $camper->id,
-                'type'         => ContactType::EMERGENCY_CONTACT,
-                'full_name'    => $data['emergency_name'],
-                'relationship' => $data['emergency_relationship'],
-                'phone'        => $data['emergency_phone'],
-                'email'        => $data['emergency_email'] ?? null,
-                'is_primary'   => true,
-            ]);
-
-            // ── 8. Mark code as CLAIMED ───────────────────────────────────────
+            // ── 7. Mark code as CLAIMED ───────────────────────────────────────
             $this->codeRepository->markAsClaimed($registrationCode);
 
             // Transaction commits here ─────────────────────────────────────────
 
-            // ── 9. Dispatch async jobs (outside transaction is fine — they are ─
-            //        read-only in terms of registration data) ──────────────────
+            Log::info('registration.complete', [
+                'camper_number' => $camper->camper_number,
+                'category'      => $camper->category->value,
+                'church_id'     => $camper->church_id,
+                'payment_type'  => $registrationCode->payment_type->value,
+            ]);
+
+            // ── 9. Dispatch async jobs ────────────────────────────────────────
             GenerateCamperDocumentsJob::dispatch($camper->id);
 
             SendRegistrationConfirmationSmsJob::dispatch(

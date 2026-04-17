@@ -40,30 +40,39 @@ class PaymentService
         string $phone,
         int    $amountNaira,
     ): array {
-        // Generate and persist the code inside a transaction so that
-        // if Paystack fails we can cleanly roll back.
         $registrationCode = DB::transaction(function () use ($name, $phone) {
             $code = $this->codeGenerationService->generate();
 
             return $this->codeRepository->create([
-                'code'         => $code,
-                'payment_type' => PaymentType::ONLINE,
-                'status'       => CodeStatus::PENDING,
-                'prefill_name' => $name,
-                'prefill_phone'=> $phone,
+                'code'          => $code,
+                'payment_type'  => PaymentType::ONLINE,
+                'status'        => CodeStatus::PENDING,
+                'prefill_name'  => $name,
+                'prefill_phone' => $phone,
             ]);
         });
 
-        // Call Paystack outside the transaction — network failure should not
-        // roll back the code creation. The code can be re-used on retry.
-        $paystackData = $this->callPaystackInitialize(
-            reference: $registrationCode->code,
-            amountKobo: $amountNaira * 100,
-            name: $name,
-            phone: $phone,
-        );
+        Log::info('payment.initiate', [
+            'code'   => $registrationCode->code,
+            'phone'  => $phone,
+            'amount' => $amountNaira,
+        ]);
 
-        // Persist the Paystack reference for webhook reconciliation
+        try {
+            $paystackData = $this->callPaystackInitialize(
+                reference:  $registrationCode->code,
+                amountKobo: $amountNaira * 100,
+                name:       $name,
+                phone:      $phone,
+            );
+        } catch (\Throwable $e) {
+            Log::error('payment.paystack_init_failed', [
+                'code'  => $registrationCode->code,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+
         $registrationCode->update([
             'paystack_reference' => $paystackData['reference'],
         ]);
@@ -99,7 +108,12 @@ class PaymentService
 
         $this->codeRepository->markAsActive($registrationCode, $amountNaira);
 
-        // Dispatch SMS to camper
+        Log::info('payment.activated', [
+            'code'   => $registrationCode->code,
+            'amount' => $amountNaira,
+            'phone'  => $registrationCode->prefill_phone,
+        ]);
+
         SendRegistrationCodeSmsJob::dispatch(
             phone: $registrationCode->prefill_phone,
             code:  $registrationCode->code,
@@ -160,6 +174,13 @@ class PaymentService
                 ),
             ]);
 
+            Log::info('payment.offline_confirmed', [
+                'code'       => $registrationCode->code,
+                'payment_id' => $payment->id,
+                'amount'     => $confirmedPayment->amount,
+                'confirmed_by' => $confirmedByUserId,
+            ]);
+
             SendRegistrationCodeSmsJob::dispatch(
                 phone: $confirmedPayment->submitted_phone,
                 code:  $registrationCode->code,
@@ -186,6 +207,12 @@ class PaymentService
 
         $rejected = $this->offlinePaymentRepository->reject($payment, $rejectedByUserId, $reason);
 
+        Log::info('payment.offline_rejected', [
+            'payment_id'  => $payment->id,
+            'rejected_by' => $rejectedByUserId,
+            'reason'      => $reason,
+        ]);
+
         \App\Jobs\SendPaymentRejectedSmsJob::dispatch(
             phone:  $rejected->submitted_phone,
             name:   $rejected->submitted_name,
@@ -207,13 +234,16 @@ class PaymentService
         string $name,
         string $phone,
     ): array {
+        $callbackUrl = route('registration.callback') . '?reference=' . $reference;
+
         $response = Http::withToken(config('services.paystack.secret_key'))
             ->acceptJson()
             ->post(config('services.paystack.payment_url') . '/transaction/initialize', [
-                'reference' => $reference,
-                'amount'    => $amountKobo,
-                'email'     => config('services.paystack.merchant_email'),
-                'metadata'  => [
+                'reference'    => $reference,
+                'amount'       => $amountKobo,
+                'email'        => config('services.paystack.merchant_email'),
+                'callback_url' => $callbackUrl,
+                'metadata'     => [
                     'custom_fields' => [
                         ['display_name' => 'Name',  'variable_name' => 'name',  'value' => $name],
                         ['display_name' => 'Phone', 'variable_name' => 'phone', 'value' => $phone],
@@ -226,7 +256,7 @@ class PaymentService
         $data = $response->json('data');
 
         return [
-            'reference'       => $data['reference'],
+            'reference'         => $data['reference'],
             'authorization_url' => $data['authorization_url'],
         ];
     }

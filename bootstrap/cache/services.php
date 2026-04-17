@@ -52,6 +52,10 @@
     48 => 'Spatie\\Permission\\PermissionServiceProvider',
     49 => 'App\\Providers\\AppServiceProvider',
     50 => 'App\\Providers\\RepositoryServiceProvider',
+    51 => 'App\\Providers\\Filament\\AdminPanelProvider',
+    52 => 'App\\Providers\\AppServiceProvider',
+    53 => 'App\\Providers\\RepositoryServiceProvider',
+    54 => 'App\\Providers\\Filament\\AdminPanelProvider',
   ),
   'eager' => 
   array (
@@ -92,6 +96,10 @@
     34 => 'Spatie\\Permission\\PermissionServiceProvider',
     35 => 'App\\Providers\\AppServiceProvider',
     36 => 'App\\Providers\\RepositoryServiceProvider',
+    37 => 'App\\Providers\\Filament\\AdminPanelProvider',
+    38 => 'App\\Providers\\AppServiceProvider',
+    39 => 'App\\Providers\\RepositoryServiceProvider',
+    40 => 'App\\Providers\\Filament\\AdminPanelProvider',
   ),
   'deferred' => 
   array (

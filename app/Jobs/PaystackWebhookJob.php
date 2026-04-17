@@ -30,20 +30,26 @@ class PaystackWebhookJob implements ShouldQueue
     public function handle(PaymentService $paymentService): void
     {
         if ($this->event !== 'charge.success') {
-            Log::info("PaystackWebhookJob: unhandled event [{$this->event}]. Skipping.");
+            Log::info('webhook.paystack_unhandled', ['event' => $this->event]);
             return;
         }
 
         $reference  = $this->data['reference'];
         $amountKobo = (int) $this->data['amount'];
 
-        Log::info("PaystackWebhookJob: processing [{$reference}] amount [{$amountKobo} kobo]");
+        Log::info('webhook.paystack_processing', [
+            'reference'   => $reference,
+            'amount_kobo' => $amountKobo,
+        ]);
 
         $paymentService->handlePaystackSuccess($reference, $amountKobo);
     }
 
     public function failed(\Throwable $exception): void
     {
-        Log::error("PaystackWebhookJob failed for reference [{$this->data['reference']}]: " . $exception->getMessage());
+        Log::error('webhook.paystack_job_failed', [
+            'reference' => $this->data['reference'] ?? 'unknown',
+            'error'     => $exception->getMessage(),
+        ]);
     }
 }

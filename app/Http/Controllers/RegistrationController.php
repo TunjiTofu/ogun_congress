@@ -4,19 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\SubmitRegistrationRequest;
 use App\Models\Camper;
+use App\Models\ClubRank;
+use App\Models\District;
 use App\Models\RegistrationCode;
 use App\Services\DocumentGenerationService;
 use App\Services\RegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 
 class RegistrationController extends Controller
 {
     public function __construct(
-        private readonly RegistrationService $registrationService,
-        private readonly DocumentGenerationService $documentService,
+        protected readonly RegistrationService $registrationService,
+        protected readonly DocumentGenerationService $documentService,
     ) {}
 
     /**
@@ -129,13 +130,13 @@ class RegistrationController extends Controller
      *
      * Validates the code and redirects to the registration wizard.
      */
-    public function validateCodeWeb(Request $request)
+    public function validateCodeWeb(\Illuminate\Http\Request $request)
     {
         $request->validate(['code' => ['required', 'string']]);
 
         try {
             $this->registrationService->validateCode($request->input('code'));
-        } catch (ValidationException $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return back()
                 ->withInput()
                 ->with('error', $e->validator->errors()->first('code'));
@@ -153,14 +154,21 @@ class RegistrationController extends Controller
     {
         try {
             $prefill = $this->registrationService->validateCode($code);
-        } catch (ValidationException $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->route('registration.index')
                 ->with('error', $e->validator->errors()->first('code'));
         }
 
-        $districts = \App\Models\District::orderBy('name')->get();
+        $districts = District::orderBy('name')->get();
 
-        return view('registration.form', compact('code', 'prefill', 'districts'));
+        // Group ranks by ministry for the Alpine.js CLUB_RANKS constant
+        $clubRanks = ClubRank::orderBy('sort_order')
+            ->get(['ministry', 'rank_name'])
+            ->groupBy('ministry')
+            ->map(fn ($ranks) => $ranks->pluck('rank_name')->values())
+            ->toArray();
+
+        return view('registration.form', compact('code', 'prefill', 'districts', 'clubRanks'));
     }
 
     /**

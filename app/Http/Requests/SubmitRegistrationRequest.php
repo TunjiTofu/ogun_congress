@@ -42,41 +42,16 @@ class SubmitRegistrationRequest extends FormRequest
             'parent_phone'          => ['nullable', 'string', 'regex:/^(0|\+?234)[789][01]\d{8}$/'],
             'parent_email'          => ['nullable', 'email', 'max:191'],
 
-            // Step 4 — Health (all optional)
+            // Step 3 — Health (all optional — user may skip entirely)
             'medical_conditions'    => ['nullable', 'string'],
             'medications'           => ['nullable', 'string'],
             'allergies'             => ['nullable', 'string'],
-            'dietary_restrictions'  => ['nullable', 'string'],
-            'doctor_name'           => ['nullable', 'string', 'max:191'],
-            'doctor_phone'          => ['nullable', 'string', 'regex:/^(0|\+?234)[789][01]\d{8}$/'],
-            'insurance_details'     => ['nullable', 'string'],
 
-            // Step 5 — Emergency Contact
-            'emergency_name'        => ['required', 'string', 'max:191'],
-            'emergency_relationship'=> ['required', 'string', 'max:50'],
-            'emergency_email'       => ['nullable', 'email', 'max:191'],
-
-            /**
-             * Emergency contact phone must be globally unique across
-             * camper_contacts WHERE type = emergency_contact.
-             *
-             * We cannot use a simple Rule::unique() here because the uniqueness
-             * is scoped to a specific column value. We use a custom closure instead.
-             */
-            'emergency_phone'       => [
-                'required',
-                'string',
-                'regex:/^(0|\+?234)[789][01]\d{8}$/',
-                function (string $attribute, string $value, \Closure $fail) {
-                    $exists = CamperContact::where('phone', $value)
-                        ->where('type', ContactType::EMERGENCY_CONTACT)
-                        ->exists();
-
-                    if ($exists) {
-                        $fail('This phone number is already registered as an emergency contact for another camper.');
-                    }
-                },
-            ],
+            // Step 4 — Parent/Guardian (conditionally required for under-16)
+            'parent_name'           => ['nullable', 'string', 'max:191'],
+            'parent_relationship'   => ['nullable', 'string', 'max:50'],
+            'parent_phone'          => ['nullable', 'string', 'regex:/^(0|\+?234)[789][01]\d{8}$/'],
+            'parent_email'          => ['nullable', 'email', 'max:191'],
         ];
     }
 

@@ -53,6 +53,7 @@ class PaymentController extends Controller
             ->first();
 
         if (! $registrationCode) {
+            Log::warning('payment.status_code_not_found', ['code' => $code]);
             return response()->json(['success' => false, 'message' => 'Code not found.'], 404);
         }
 
@@ -90,8 +91,8 @@ class PaymentController extends Controller
         return redirect()->away($result['authorization_url']);
     }
 
+
     /*
-    *
     * Receives Paystack webhook events.
     * Responds 200 immediately and processes in queue — never blocks.
     * Excluded from CSRF middleware in bootstrap/app.php.
@@ -103,14 +104,17 @@ class PaymentController extends Controller
 
         // Verify HMAC-SHA512 signature
         if (! $this->paymentService->verifyPaystackWebhookSignature($payload, $signature)) {
-            Log::warning('Paystack webhook: invalid signature. Rejected.');
+            Log::warning('webhook.paystack_invalid_signature');
             return response()->json(['message' => 'Invalid signature.'], 401);
         }
 
         $event = $request->input('event');
         $data  = $request->input('data', []);
 
-        Log::info("Paystack webhook received: [{$event}]", ['reference' => $data['reference'] ?? 'none']);
+        Log::info('webhook.paystack_received', [
+            'event'     => $event,
+            'reference' => $data['reference'] ?? 'none',
+        ]);
 
         // Dispatch to queue — do not process inline
         PaystackWebhookJob::dispatch($event, $data);

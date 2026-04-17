@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="csrf-token" content="{ csrf_token() }" />
-    <title>Pay Online — { setting('camp_name', 'Ogun Youth Camp') }</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}" />
+    <title>Pay Online — {{ setting('camp_name', 'Ogun Youth Camp') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config={theme:{extend:{colors:{navy:'#1B3A6B',gold:'#C9A94D',steel:'#2E75B6'}}}}</script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
 </head>
 <body class="bg-gray-50">
+
 <nav class="bg-navy py-3 px-4">
     <div class="max-w-6xl mx-auto flex items-center justify-between">
-        <a href="{ route('home') }" class="text-white font-bold text-sm">&#8592; Back to Camp Home</a>
-        <span class="text-gold text-sm font-semibold">{ setting('camp_name', 'Ogun Youth Camp') }</span>
+        <a href="{{ route('home') }}" class="text-white font-bold text-sm">&#8592; Back to Camp Home</a>
+        <span class="text-gold text-sm font-semibold">{{ setting('camp_name', 'Ogun Youth Camp') }}</span>
     </div>
 </nav>
+
 <div class="min-h-screen bg-gray-50 py-12 px-4">
     <div class="max-w-md mx-auto">
 
@@ -30,7 +31,20 @@
             </p>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm p-8" x-data="payForm()">
+        <div class="bg-white rounded-2xl shadow-sm p-8"
+             x-data="{
+                category: '{{ old('category') }}',
+                submitting: false,
+                fees: {
+                    adventurer:   {{ (int) setting('fee_adventurer', 5000) }},
+                    pathfinder:   {{ (int) setting('fee_pathfinder', 5000) }},
+                    senior_youth: {{ (int) setting('fee_senior_youth', 7000) }}
+                },
+                amount() {
+                    const val = this.fees[this.category];
+                    return val ? val.toLocaleString() : '—';
+                }
+             }">
 
             @if($errors->any())
                 <div class="mb-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
@@ -38,13 +52,14 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('payment.initiate-web') }}" @submit="submitting = true">
+            <form method="POST" action="{{ route('registration.payment.initiate-web') }}"
+                  @submit="submitting = true">
                 @csrf
 
                 {{-- Name --}}
                 <div class="space-y-1 mb-4">
-                    <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
-                    <input type="text" id="name" name="name" value="{{ old('name') }}"
+                    <label for="pname" class="block text-sm font-medium text-gray-700">Full Name</label>
+                    <input type="text" id="pname" name="name" value="{{ old('name') }}"
                            placeholder="As it will appear on your ID card"
                            required
                            class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
@@ -55,8 +70,8 @@
 
                 {{-- Phone --}}
                 <div class="space-y-1 mb-4">
-                    <label for="phone" class="block text-sm font-medium text-gray-700">Phone Number</label>
-                    <input type="tel" id="phone" name="phone" value="{{ old('phone') }}"
+                    <label for="pphone" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    <input type="tel" id="pphone" name="phone" value="{{ old('phone') }}"
                            placeholder="08012345678"
                            required
                            class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
@@ -68,24 +83,30 @@
 
                 {{-- Category --}}
                 <div class="space-y-1 mb-6">
-                    <label for="category" class="block text-sm font-medium text-gray-700">Category</label>
-                    <select id="category" name="category" required x-model="category"
+                    <label for="pcategory" class="block text-sm font-medium text-gray-700">Category</label>
+                    <select id="pcategory" name="category" required x-model="category"
                             class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
                                    focus:outline-none focus:ring-2 focus:ring-navy
                                    @error('category') border-red-400 @enderror">
                         <option value="">— Select your category —</option>
-                        <option value="adventurer"   {{ old('category') === 'adventurer'   ? 'selected' : '' }}>Adventurer (Ages 6–9) — ₦{{ number_format((int) setting('fee_adventurer', 5000)) }}</option>
-                        <option value="pathfinder"   {{ old('category') === 'pathfinder'   ? 'selected' : '' }}>Pathfinder (Ages 10–15) — ₦{{ number_format((int) setting('fee_pathfinder', 5000)) }}</option>
-                        <option value="senior_youth" {{ old('category') === 'senior_youth' ? 'selected' : '' }}>Senior Youth (Ages 16+) — ₦{{ number_format((int) setting('fee_senior_youth', 7000)) }}</option>
+                        <option value="adventurer"   {{ old('category') === 'adventurer'   ? 'selected' : '' }}>
+                            Adventurer (Ages 6–9) — &#8358;{{ number_format((int) setting('fee_adventurer', 5000)) }}
+                        </option>
+                        <option value="pathfinder"   {{ old('category') === 'pathfinder'   ? 'selected' : '' }}>
+                            Pathfinder (Ages 10–15) — &#8358;{{ number_format((int) setting('fee_pathfinder', 5000)) }}
+                        </option>
+                        <option value="senior_youth" {{ old('category') === 'senior_youth' ? 'selected' : '' }}>
+                            Senior Youth (Ages 16+) — &#8358;{{ number_format((int) setting('fee_senior_youth', 7000)) }}
+                        </option>
                     </select>
                     @error('category')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
 
                 {{-- Amount display --}}
-                <div class="bg-navy/5 rounded-xl p-4 mb-6 text-center" x-show="category">
+                <div class="bg-gray-50 rounded-xl p-4 mb-6 text-center" x-show="category">
                     <p class="text-sm text-gray-500">Amount to pay</p>
                     <p class="text-2xl font-extrabold text-navy">
-                        ₦<span x-text="amount()"></span>
+                        &#8358;<span x-text="amount()"></span>
                     </p>
                 </div>
 
@@ -93,8 +114,8 @@
                         :disabled="submitting || !category"
                         class="w-full bg-green-600 text-white font-bold py-3 rounded-xl
                                hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                    <span x-show="!submitting">Proceed to Payment →</span>
-                    <span x-show="submitting">Redirecting to Paystack…</span>
+                    <span x-show="!submitting">Proceed to Payment &rarr;</span>
+                    <span x-show="submitting">Redirecting to Paystack&hellip;</span>
                 </button>
             </form>
         </div>
@@ -106,23 +127,5 @@
     </div>
 </div>
 
-<script>
-    <script>
-        function payForm() {
-        const fees = {
-        adventurer:   {{ (int) setting('fee_adventurer', 5000) }},
-        pathfinder:   {{ (int) setting('fee_pathfinder', 5000) }},
-        senior_youth: {{ (int) setting('fee_senior_youth', 7000) }},
-    };
-        return {
-        category:   '{{ old('category') }}',
-        submitting: false,
-        amount() {
-        return this.category ? fees[this.category]?.toLocaleString() ?? '—' : '—';
-    }
-    }
-    }
-</script>
-</script>
 </body>
 </html>

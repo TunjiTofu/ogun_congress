@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             CampSettingsSeeder::class,
             DistrictAndChurchSeeder::class,
             BadgeColorSeeder::class,
+            ClubRankSeeder::class,
             AdminUserSeeder::class,
         ]);
     }

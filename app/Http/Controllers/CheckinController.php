@@ -9,6 +9,7 @@ use App\Enums\CheckinEventType;
 use App\Repositories\Interfaces\CamperRepositoryInterface;
 use App\Repositories\Interfaces\CheckinRepositoryInterface;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -39,6 +40,7 @@ class CheckinController extends Controller
             ->first();
 
         if (! $user || ! Hash::check($request->pin, $user->password)) {
+            Log::warning('checkin.auth_failed', ['email' => $request->email]);
             throw ValidationException::withMessages([
                 'pin' => 'Invalid credentials.',
             ]);
@@ -54,6 +56,11 @@ class CheckinController extends Controller
             abilities:  ['checkin'],
             expiresAt:  now()->addDays(7),
         );
+
+        Log::info('checkin.auth_success', [
+            'user_id'   => $user->id,
+            'device_id' => $request->device_id,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -124,11 +131,20 @@ class CheckinController extends Controller
         );
 
         $inserted = $this->checkinRepository->bulkInsertDeduped(array_values($enriched));
+        $skipped  = count($request->events) - $inserted;
+
+        if ($inserted > 0) {
+            Log::info('checkin.events_synced', [
+                'inserted'  => $inserted,
+                'skipped'   => $skipped,
+                'device_id' => $request->events[0]['device_id'] ?? 'unknown',
+            ]);
+        }
 
         return response()->json([
             'success'  => true,
             'inserted' => $inserted,
-            'skipped'  => count($request->events) - $inserted,
+            'skipped'  => $skipped,
         ]);
     }
 

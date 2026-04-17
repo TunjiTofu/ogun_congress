@@ -6,10 +6,11 @@
     <meta name="csrf-token" content="{{ csrf_token() }}" />
     <title>Register — {{ setting('camp_name', 'Ogun Youth Camp') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>tailwind.config={theme:{extend:{colors:{navy:'#1B3A6B',gold:'#C9A94D'}}}}</script>
+    <script>tailwind.config={theme:{extend:{colors:{navy:'#1B3A6B',gold:'#C9A94D',steel:'#2E75B6'}}}}</script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="bg-gray-50">
+
 <nav class="bg-navy py-3 px-4">
     <div class="max-w-6xl mx-auto flex items-center justify-between">
         <a href="{{ route('home') }}" class="text-white font-bold text-sm">&#8592; Back to Camp Home</a>
@@ -17,14 +18,9 @@
     </div>
 </nav>
 
-
-
-
-
 <div class="min-h-screen bg-gray-50 py-12 px-4">
     <div class="max-w-md mx-auto">
 
-        {{-- Header --}}
         <div class="text-center mb-8">
             <div class="w-16 h-16 bg-navy rounded-full flex items-center justify-center mx-auto mb-4">
                 <span class="text-gold text-2xl">🔑</span>
@@ -35,31 +31,36 @@
             </p>
         </div>
 
-        {{-- Error from session --}}
         @if(session('error'))
             <div class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
                 {{ session('error') }}
             </div>
         @endif
 
-        {{-- Code entry form --}}
         <div class="bg-white rounded-2xl shadow-sm p-8">
-            <form method="POST" action="{{ route('registration.validate-code-web') }}" x-data="codeForm()">
+            {{--
+                IMPORTANT: We use x-data with a property named "codeVal" (not "code").
+                Naming it "code" conflicts with the browser's automatic global variable
+                created for any element with id="code", causing [object HTMLInputElement].
+                We also avoid id="code" on the input for the same reason.
+            --}}
+            <form method="POST"
+                  action="{{ route('registration.validate-code-web') }}"
+                  x-data="{ codeVal: '{{ old('code', request('code')) }}' }">
                 @csrf
 
                 <div class="space-y-2">
-                    <label for="code" class="block text-sm font-medium text-gray-700">
+                    <label for="reg-code" class="block text-sm font-medium text-gray-700">
                         Registration Code
                     </label>
                     <input
                         type="text"
-                        id="code"
+                        id="reg-code"
                         name="code"
-                        value="{{ old('code', request('code')) }}"
                         placeholder="OGN-2026-XXXXXX"
-                        maxlength="14"
-                        x-model="code"
-                        @input="code = code.toUpperCase()"
+                        maxlength="15"
+                        x-model="codeVal"
+                        @input="codeVal = $event.target.value.toUpperCase()"
                         class="w-full px-4 py-3 border border-gray-300 rounded-xl font-mono text-center
                                text-lg tracking-widest uppercase focus:outline-none focus:ring-2
                                focus:ring-navy focus:border-transparent
@@ -73,7 +74,7 @@
                 </div>
 
                 <button type="submit"
-                        :disabled="code.length < 6"
+                        :disabled="codeVal.length < 6"
                         class="w-full mt-6 bg-navy text-white font-bold py-3 rounded-xl
                                hover:bg-steel transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Continue to Registration →
@@ -82,13 +83,13 @@
 
             <div class="mt-6 pt-6 border-t border-gray-100 text-center text-sm text-gray-500">
                 <p>Don't have a code yet?</p>
-                <a href="{{ route('home') }}#how-to-register" class="text-navy font-semibold hover:underline">
+                <a href="{{ route('home') }}#how-to-register"
+                   class="text-navy font-semibold hover:underline">
                     See how to get one →
                 </a>
             </div>
         </div>
 
-        {{-- Online payment option --}}
         @if(setting('paystack_enabled', '1') === '1')
             <div class="mt-6 bg-white rounded-2xl shadow-sm p-6 text-center">
                 <p class="text-sm text-gray-500 mb-4">Or pay online and get your code instantly</p>
@@ -108,17 +109,6 @@
         </p>
     </div>
 </div>
-
-
-@push('scripts')
-    <script>
-        function codeForm() {
-            return {
-                code: '{{ old('code', request('code')) }}'
-            }
-        }
-    </script>
-@endpush
 
 </body>
 </html>
