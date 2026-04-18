@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
-    <title>Complete Registration &mdash; {{ setting('camp_name', 'Ogun Youth Camp') }}</title>
+    <title>Complete Registration &mdash; {{ setting('camp_name', 'Ogun Youth Congress') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>tailwind.config={theme:{extend:{colors:{navy:'#1B3A6B',gold:'#C9A94D',steel:'#2E75B6'}}}}</script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
@@ -23,45 +23,39 @@
     // ── Club ranks from DB (passed from controller) ───────────────────────────────
     const CLUB_RANKS = @json($clubRanks);
 
-    // ── Age/category computation ──────────────────────────────────────────────────
-    function computeCategory(dob) {
+    // ── Helpers ───────────────────────────────────────────────────────────────────
+    function getAge(dob) {
         if (!dob) return null;
-        const today = new Date();
-        const birth = new Date(dob);
-        let age = today.getFullYear() - birth.getFullYear();
+        const today = new Date(), birth = new Date(dob);
+        let a = today.getFullYear() - birth.getFullYear();
         const m = today.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-        if (age < 6)               return null;
-        if (age >= 6 && age <= 9)  return 'adventurer';
-        if (age >= 10 && age <= 15) return 'pathfinder';
-        return 'senior_youth';
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
+        return a;
     }
-
-    function categoryLabel(cat) {
-        return { adventurer: 'Adventurer', pathfinder: 'Pathfinder', senior_youth: 'Senior Youth' }[cat] ?? '';
+    function getCategory(dob) {
+        const age = getAge(dob);
+        if (age === null || age < 6) return null;
+        if (age <= 9)  return 'adventurer';
+        if (age <= 15) return 'pathfinder';
+        return 'senior_youth';
     }
 
     // ── Wizard ────────────────────────────────────────────────────────────────────
     function wizard() {
         return {
-            // Steps: 1=Personal+Church, 2=Parent/Guardian, 3=Health, 4=Review
             step: 1,
             totalSteps: 4,
             labels: ['Personal & Church Details', 'Parent / Guardian', 'Health Information', 'Review & Submit'],
+            validationError: '',
 
-            // DOB / category reactive state
             dob: '{{ old("date_of_birth", "") }}',
-            get age() {
-                if (!this.dob) return null;
-                const today = new Date(), birth = new Date(this.dob);
-                let a = today.getFullYear() - birth.getFullYear();
-                const m = today.getMonth() - birth.getMonth();
-                if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
-                return a;
-            },
-            get category() { return computeCategory(this.dob); },
+            districtId: '{{ old("district_id", "") }}',
+            churches: [],
+
+            get age()      { return getAge(this.dob); },
+            get category() { return getCategory(this.dob); },
+
             get seniorYouthGroup() {
-                // Ambassador: 16-21, Young Adults: 22+
                 if (this.category !== 'senior_youth' || this.age === null) return null;
                 return this.age <= 21 ? 'Ambassador' : 'Young Adults';
             },
@@ -69,20 +63,17 @@
                 if (!this.dob) return '';
                 const cat = this.category;
                 if (!cat) return '<span style="color:#DC2626">&#9888; Age does not meet camp requirements (minimum age: 6).</span>';
-                const label = categoryLabel(cat);
                 if (cat === 'senior_youth') {
-                    const group = this.seniorYouthGroup;
-                    return `You will be registered as <strong>Senior Youth &mdash; ${group}</strong> (age ${this.age}).`;
+                    return `You will be registered as <strong>Senior Youth &ndash; ${this.seniorYouthGroup}</strong> (age ${this.age}).`;
                 }
-                //return `You will be registered as a <strong>${label}</strong> (age ${this.age}).`;
-                return `You will be registered as a <strong>${label}</strong>.`;
+                const labels = { adventurer: 'Adventurer', pathfinder: 'Pathfinder' };
+                return `You will be registered as a <strong>${labels[cat]}</strong> (age ${this.age}).`;
             },
             get needsParent() {
-                const cat = this.category;
-                return cat === 'adventurer' || cat === 'pathfinder';
+                return this.category === 'adventurer' || this.category === 'pathfinder';
             },
             get availableRanks() {
-                if (this.category === 'senior_youth') return [];  // auto-set from age
+                if (!this.category || this.category === 'senior_youth') return [];
                 return CLUB_RANKS[this.category] ?? [];
             },
 
@@ -100,13 +91,57 @@
                 document.getElementById('photo-input').value = '';
             },
 
+            // Cascading church dropdown (moved into wizard to avoid $root issues)
+            async loadChurches() {
+                if (!this.districtId) { this.churches = []; return; }
+                const res = await fetch('/api/churches?district_id=' + this.districtId);
+                this.churches = await res.json();
+            },
+
             // Health toggle
             noHealthIssues: false,
 
-            // Navigation
+            // ── Validation ────────────────────────────────────────────────────────
+            validateStep1() {
+                this.validationError = '';
+                if (!this.dob) { this.validationError = 'Please enter your date of birth.'; return false; }
+                if (!this.category) { this.validationError = 'Age does not meet camp requirements (minimum age: 6).'; return false; }
+                const gender = document.querySelector('input[name="gender"]:checked');
+                if (!gender) { this.validationError = 'Please select your gender.'; return false; }
+                const photo = document.getElementById('photo-input');
+                if (!photo || !photo.files.length) { this.validationError = 'Please upload a passport photo.'; return false; }
+                const districtEl = document.querySelector('select[x-model="districtId"]') || { value: this.districtId };
+                if (!this.districtId) { this.validationError = 'Please select your district.'; return false; }
+                const church = document.querySelector('select[name="church_id"]');
+                if (!church || !church.value) { this.validationError = 'Please select your church.'; return false; }
+                return true;
+            },
+            validateStep2() {
+                this.validationError = '';
+                if (!this.needsParent) return true; // Senior Youth skip
+                const name  = document.querySelector('input[name="parent_name"]');
+                const phone = document.querySelector('input[name="parent_phone"]');
+                if (!name?.value.trim())  { this.validationError = 'Please enter the parent/guardian full name.'; return false; }
+                if (!phone?.value.trim()) { this.validationError = 'Please enter the parent/guardian phone number.'; return false; }
+                return true;
+            },
+            validateStep3() {
+                this.validationError = '';
+                return true; // Health is fully optional
+            },
+
+            // ── Navigation ────────────────────────────────────────────────────────
             stepLabel() { return this.labels[this.step - 1] ?? ''; },
+
             next() {
-                // Skip parent step if senior youth
+                // Run validation for current step
+                const validators = { 1: () => this.validateStep1(), 2: () => this.validateStep2(), 3: () => this.validateStep3() };
+                if (validators[this.step] && !validators[this.step]()) {
+                    window.scrollTo(0, 0);
+                    return;
+                }
+                this.validationError = '';
+                // Skip parent step for Senior Youth
                 if (this.step === 1 && !this.needsParent) {
                     this.step = 3;
                 } else if (this.step < this.totalSteps) {
@@ -115,7 +150,8 @@
                 window.scrollTo(0, 0);
             },
             prev() {
-                // Skip parent step backwards if senior youth
+                this.validationError = '';
+                // Skip parent step backwards for Senior Youth
                 if (this.step === 3 && !this.needsParent) {
                     this.step = 1;
                 } else if (this.step > 1) {
@@ -123,20 +159,10 @@
                 }
                 window.scrollTo(0, 0);
             },
-        };
-    }
 
-    // ── Cascading district/church dropdown ────────────────────────────────────────
-    function districtChurch(selectedDistrictId) {
-        return {
-            districtId: selectedDistrictId || '',
-            churches: [],
-            async loadChurches() {
-                if (!this.districtId) { this.churches = []; return; }
-                const res = await fetch('/api/churches?district_id=' + this.districtId);
-                this.churches = await res.json();
+            init() {
+                if (this.districtId) this.loadChurches();
             },
-            init() { if (this.districtId) this.loadChurches(); }
         };
     }
 </script>
@@ -170,6 +196,13 @@
 
         {{-- Required fields note --}}
         <p class="text-xs text-gray-400 mb-4">Fields marked <span class="text-red-500 font-bold">*</span> are compulsory.</p>
+
+        {{-- Front-end validation error --}}
+        <div x-show="validationError" x-cloak
+             class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-start gap-2">
+            <span class="text-red-500 font-bold flex-shrink-0">&#9888;</span>
+            <span x-text="validationError"></span>
+        </div>
 
         {{-- Progress bar --}}
         <div class="mb-6">

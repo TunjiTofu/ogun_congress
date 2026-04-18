@@ -41,7 +41,9 @@ class AdminPanelProvider extends PanelProvider
                 'info'    => Color::Blue,
             ])
             ->brandName('Ogun Youth Camp')
-            ->favicon(asset('images/favicon.png'))
+            ->brandLogo(asset('images/logo.svg'))
+            ->brandLogoHeight('2.5rem')
+            ->favicon(asset('images/favicon.svg'))
             ->navigationGroups([
                 NavigationGroup::make('Payments'),
                 NavigationGroup::make('Campers'),

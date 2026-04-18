@@ -41,7 +41,28 @@ Route::get('/api/churches', function () {
         ->get(['id', 'name']);
 });
 
-// ── Offline check-in PWA shell ─────────────────────────────────────────────────
+// ── Camper Self-Service Portal ─────────────────────────────────────────────────
+Route::prefix('portal')->name('portal.')->group(function () {
+    Route::get('/',        [App\Http\Controllers\CamperPortalController::class, 'index'])->name('index');
+    Route::post('/login',  [App\Http\Controllers\CamperPortalController::class, 'login'])->name('login');
+    Route::get('/dashboard', [App\Http\Controllers\CamperPortalController::class, 'dashboard'])->name('dashboard');
+    Route::post('/logout', [App\Http\Controllers\CamperPortalController::class, 'logout'])->name('logout');
+});
+Route::get('/documents/download/{path}', function (string $path) {
+    $filePath = base64_decode($path);
+
+    if (! \Illuminate\Support\Facades\Storage::disk('private')->exists($filePath)) {
+        abort(404, 'Document not found.');
+    }
+
+    $fullPath = storage_path('app/private/' . $filePath);
+    $filename = basename($filePath);
+
+    return response()->file($fullPath, [
+        'Content-Type'        => 'application/pdf',
+        'Content-Disposition' => "inline; filename=\"{$filename}\"",
+    ]);
+})->name('documents.download');
 Route::get('/checkin/{any?}', fn () => view('pwa.checkin'))
     ->where('any', '.*')
     ->name('checkin.app');

@@ -4,22 +4,17 @@ namespace App\Services;
 
 use App\Models\Camper;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class DocumentGenerationService
 {
-    /**
-     * Generate the camper ID card PDF and store it on the private disk.
-     * Updates camper.id_card_path on completion.
-     */
     public function generateIdCard(Camper $camper): string
     {
-        $qrCode = $this->generateQrCodeBase64($camper->camper_number);
-
+        $qrCode      = $this->generateQrCodeSvg($camper->camper_number);
         $photoBase64 = $this->encodePhotoBase64($camper);
-
-        $badgeColor = $camper->badge_color
+        $badgeColor  = $camper->badge_color
             ?? config("camp.badge_colors.{$camper->category->value}", '#1B3A6B');
 
         $pdf = Pdf::loadView('pdf.id-card', [
@@ -29,90 +24,52 @@ class DocumentGenerationService
             'badgeColor'  => $badgeColor,
             'campName'    => setting('camp_name', 'Ogun Youth Camp'),
             'campYear'    => now()->year,
-        ])->setPaper([0, 0, 242.65, 153.01]); // CR80 in points (85.6mm × 53.98mm)
+        ])->setPaper([0, 0, 242.65, 153.01]);
 
-        $path     = config('camp.documents.id_card_path') . '/' . $camper->camper_number . '.pdf';
-        $disk     = config('camp.documents.id_card_disk', 'private');
-        $contents = $pdf->output();
-
-        Storage::disk($disk)->put($path, $contents);
-
+        $path = 'id-cards/' . $camper->camper_number . '.pdf';
+        Storage::disk('private')->put($path, $pdf->output());
         $camper->update(['id_card_path' => $path]);
 
+        Log::info('docs.id_card_generated', ['camper_number' => $camper->camper_number]);
         return $path;
     }
 
-    /**
-     * Generate the parental consent form PDF (under-18 campers only).
-     * Updates camper.consent_form_path on completion.
-     */
     public function generateConsentForm(Camper $camper): string
     {
         $pdf = Pdf::loadView('pdf.consent-form', [
-            'camper'    => $camper,
+            'camper'    => $camper->load(['church.district', 'contacts']),
             'campName'  => setting('camp_name', 'Ogun Youth Camp'),
             'campDates' => setting('camp_dates', 'TBA'),
             'campVenue' => setting('camp_venue', 'TBA'),
         ])->setPaper('a4', 'portrait');
 
-        $path     = config('camp.documents.consent_form_path') . '/' . $camper->camper_number . '.pdf';
-        $disk     = config('camp.documents.consent_form_disk', 'private');
-        $contents = $pdf->output();
-
-        Storage::disk($disk)->put($path, $contents);
-
+        $path = 'consent-forms/' . $camper->camper_number . '.pdf';
+        Storage::disk('private')->put($path, $pdf->output());
         $camper->update(['consent_form_path' => $path]);
 
+        Log::info('docs.consent_form_generated', ['camper_number' => $camper->camper_number]);
         return $path;
     }
 
-    /**
-     * Return a signed temporary URL for a stored PDF.
-     */
-    public function temporaryUrl(string $path, int $hours = 24): string
+    public function getDownloadUrl(string $path, int $hours = 24): string
     {
-        return Storage::disk(config('camp.documents.id_card_disk', 'private'))
-            ->temporaryUrl($path, now()->addHours($hours));
+        if (config('filesystems.disks.private.driver') === 's3') {
+            return Storage::disk('private')->temporaryUrl($path, now()->addHours($hours));
+        }
+        return route('documents.download', ['path' => base64_encode($path)]);
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    /**
-     * Generate QR code as a base64-encoded PNG for embedding in the PDF.
-     * QR encodes: OGN:{camper_number}
-     */
-    private function generateQrCodeBase64(string $camperNumber): string
+    private function generateQrCodeSvg(string $camperNumber): string
     {
-        $svg = QrCode::format('svg')
-            ->size(150)
-            ->errorCorrection('M')
-            ->generate("OGN:{$camperNumber}");
-
-        // Return as inline SVG string (DomPDF supports inline SVG)
-        return $svg;
+        return (string) QrCode::format('svg')->size(150)->errorCorrection('M')->generate("OGN:{$camperNumber}");
     }
 
-    /**
-     * Read the camper photo and return it as a base64 data URI.
-     * Falls back to a placeholder if no photo is uploaded.
-     */
     private function encodePhotoBase64(Camper $camper): string
     {
         $media = $camper->getFirstMedia('photo');
-
-        if (! $media) {
-            return '';
-        }
-
-        $path     = $media->getPath('thumb');
-        $mimeType = $media->mime_type;
-
-        if (! file_exists($path)) {
-            return '';
-        }
-
-        $encoded = base64_encode(file_get_contents($path));
-
-        return "data:{$mimeType};base64,{$encoded}";
+        if (! $media) return '';
+        $path = $media->hasGeneratedConversion('thumb') ? $media->getPath('thumb') : $media->getPath();
+        if (! file_exists($path)) return '';
+        return 'data:' . $media->mime_type . ';base64,' . base64_encode(file_get_contents($path));
     }
 }

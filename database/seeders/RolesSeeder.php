@@ -9,7 +9,13 @@ class RolesSeeder extends Seeder
 {
     public function run(): void
     {
-        $roles = ['super_admin', 'accountant', 'secretariat', 'security'];
+        $roles = [
+            'super_admin',
+            'accountant',
+            'secretariat',
+            'security',
+            'church_coordinator', // Bulk registration for local churches
+        ];
 
         foreach ($roles as $role) {
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
