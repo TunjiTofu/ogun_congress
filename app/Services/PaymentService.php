@@ -39,16 +39,18 @@ class PaymentService
         string $name,
         string $phone,
         int    $amountNaira,
+        string $category = '',
     ): array {
-        $registrationCode = DB::transaction(function () use ($name, $phone) {
+        $registrationCode = DB::transaction(function () use ($name, $phone, $amountNaira, $category) {
             $code = $this->codeGenerationService->generate();
 
             return $this->codeRepository->create([
-                'code'          => $code,
-                'payment_type'  => PaymentType::ONLINE,
-                'status'        => CodeStatus::PENDING,
-                'prefill_name'  => $name,
-                'prefill_phone' => $phone,
+                'code'             => $code,
+                'payment_type'     => PaymentType::ONLINE,
+                'status'           => CodeStatus::PENDING,
+                'prefill_name'     => $name,
+                'prefill_phone'    => $phone,
+                'prefill_category' => $category,
             ]);
         });
 

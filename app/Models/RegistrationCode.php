@@ -13,20 +13,7 @@ class RegistrationCode extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'code',
-        'payment_type',
-        'status',
-        'prefill_name',
-        'prefill_phone',
-        'amount_paid',
-        'paystack_reference',
-        'offline_payment_id',
-        'activated_at',
-        'expires_at',
-        'claimed_at',
-        'created_by',
-    ];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

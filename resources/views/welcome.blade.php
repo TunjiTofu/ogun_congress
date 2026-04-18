@@ -571,20 +571,23 @@
 
         <div class="fees-grid">
             <div class="fee-card adventurer">
-                <div class="fee-icon">&#127938;</div>
+                <img src="{{ asset('images/adventurer_logo.png') }}" alt="Adventurer Club"
+                     style="width:80px;height:80px;object-fit:contain;margin:0 auto 0.75rem;display:block;"/>
                 <div class="fee-cat">Adventurers</div>
                 <div class="fee-age">Ages 6 &ndash; 9</div>
                 <div class="fee-amount">&#8358;{{ number_format((int) setting('fee_adventurer', 5000)) }}</div>
             </div>
             <div class="fee-card pathfinder">
-                <div class="fee-icon">&#129406;</div>
+                <img src="{{ asset('images/pathfinder_logo.png') }}" alt="Pathfinder Club"
+                     style="width:80px;height:80px;object-fit:contain;margin:0 auto 0.75rem;display:block;"/>
                 <div class="fee-cat">Pathfinders</div>
                 <div class="fee-age">Ages 10 &ndash; 15</div>
                 <div class="fee-amount">&#8358;{{ number_format((int) setting('fee_pathfinder', 5000)) }}</div>
             </div>
             <div class="fee-card senior">
-                <div class="fee-icon">&#127775;</div>
-                <div class="fee-cat">Senior Youth</div>
+                <img src="{{ asset('images/senior_youth_logo.png') }}" alt="Senior Youth"
+                     style="width:80px;height:80px;object-fit:contain;margin:0 auto 0.75rem;display:block;"/>
+                <div class="fee-cat">Senior Youth (SYL)</div>
                 <div class="fee-age">Ages 16 and above</div>
                 <div class="fee-amount">&#8358;{{ number_format((int) setting('fee_senior_youth', 7000)) }}</div>
             </div>
@@ -699,6 +702,43 @@
                 </div>
             </div>
         </div>
+    </div>
+</section>
+
+<!-- ── Portal Access ─────────────────────────────────────────────────────────── -->
+<section style="background:var(--navy);padding:4rem 1.5rem;" id="portal">
+    <div class="container" style="max-width:600px;text-align:center;">
+        <div style="font-size:0.7rem;letter-spacing:0.2em;color:var(--gold);font-weight:700;text-transform:uppercase;margin-bottom:0.6rem;">
+            Already Registered?
+        </div>
+        <h2 style="font-family:'Cinzel',serif;font-size:1.8rem;font-weight:700;color:#fff;margin-bottom:0.75rem;">
+            Access Your Camper Portal
+        </h2>
+        <p style="color:rgba(255,255,255,0.65);font-size:0.9rem;margin-bottom:2rem;line-height:1.7;">
+            Enter your registration code to view and download your ID card, consent form, and camp announcements.
+        </p>
+        <form action="{{ route('portal.login') }}" method="POST" style="display:flex;gap:0.75rem;max-width:460px;margin:0 auto;">
+            @csrf
+            <input type="text" name="code" placeholder="OGN-2026-XXXXXX"
+                   style="flex:1;padding:0.9rem 1.2rem;border:none;border-radius:12px;
+                      font-family:monospace;font-size:1rem;text-align:center;
+                      letter-spacing:0.1em;text-transform:uppercase;outline:none;
+                      box-shadow:0 0 0 2px rgba(201,169,77,0.4);"
+                   maxlength="15" oninput="this.value=this.value.toUpperCase()"/>
+            <button type="submit"
+                    style="background:var(--gold);color:var(--navy);font-family:'Cinzel',serif;
+                       font-size:0.85rem;font-weight:700;padding:0.9rem 1.5rem;
+                       border:none;border-radius:12px;cursor:pointer;white-space:nowrap;
+                       transition:background 0.2s;">
+                Enter Portal &rarr;
+            </button>
+        </form>
+        @if(session('error'))
+            <p style="color:#FCA5A5;font-size:0.82rem;margin-top:0.75rem;">{{ session('error') }}</p>
+        @endif
+        @if(session('success'))
+            <p style="color:#6EE7B7;font-size:0.82rem;margin-top:0.75rem;">{{ session('success') }}</p>
+        @endif
     </div>
 </section>
 

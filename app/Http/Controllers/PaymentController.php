@@ -31,6 +31,7 @@ class PaymentController extends Controller
             name:        $request->validated('name'),
             phone:       $request->validated('phone'),
             amountNaira: $amountNaira,
+            category:    $request->validated('category'),
         );
 
         return response()->json([
@@ -53,7 +54,6 @@ class PaymentController extends Controller
             ->first();
 
         if (! $registrationCode) {
-            Log::warning('payment.status_code_not_found', ['code' => $code]);
             return response()->json(['success' => false, 'message' => 'Code not found.'], 404);
         }
 
@@ -81,6 +81,7 @@ class PaymentController extends Controller
                 name:        $request->validated('name'),
                 phone:       $request->validated('phone'),
                 amountNaira: $amountNaira,
+                category:    $request->validated('category'),
             );
         } catch (\Throwable $e) {
             return back()->withInput()->withErrors([
@@ -91,12 +92,11 @@ class PaymentController extends Controller
         return redirect()->away($result['authorization_url']);
     }
 
-
-    /*
-    * Receives Paystack webhook events.
-    * Responds 200 immediately and processes in queue — never blocks.
-    * Excluded from CSRF middleware in bootstrap/app.php.
-    */
+/*
+* Receives Paystack webhook events.
+* Responds 200 immediately and processes in queue — never blocks.
+* Excluded from CSRF middleware in bootstrap/app.php.
+*/
     public function webhook(Request $request): JsonResponse
     {
         $payload   = $request->getContent();

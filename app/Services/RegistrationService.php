@@ -52,11 +52,12 @@ class RegistrationService
         }
 
         return [
-            'code'         => $registrationCode->code,
-            'prefill_name' => $registrationCode->prefill_name,
-            'prefill_phone'=> $registrationCode->prefill_phone,
-            'amount_paid'  => $registrationCode->amount_paid,
-            'payment_type' => $registrationCode->payment_type->label(),
+            'code'              => $registrationCode->code,
+            'prefill_name'      => $registrationCode->prefill_name,
+            'prefill_phone'     => $registrationCode->prefill_phone,
+            'prefill_category'  => $registrationCode->prefill_category,
+            'amount_paid'       => $registrationCode->amount_paid,
+            'payment_type'      => $registrationCode->payment_type->label(),
         ];
     }
 
@@ -151,6 +152,8 @@ class RegistrationService
             ]);
 
             // ── 9. Dispatch async jobs ────────────────────────────────────────
+            // In production with Redis/Horizon, these are queued.
+            // With QUEUE_CONNECTION=sync (or database without a worker), they run inline.
             GenerateCamperDocumentsJob::dispatch($camper->id);
 
             SendRegistrationConfirmationSmsJob::dispatch(

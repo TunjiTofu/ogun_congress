@@ -49,8 +49,11 @@ class DistrictResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('campers_count')
                     ->label('Campers')
-                    ->counts('campers')
-                    ->sortable(),
+                    ->getStateUsing(fn ($record) => $record->churches()
+                        ->withCount('campers')
+                        ->get()
+                        ->sum('campers_count')
+                    ),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

@@ -18,9 +18,14 @@ class EditBulkBatch extends EditRecord
         ];
     }
 
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        unset($data['district_id'], $data['district_id_for_church']);
+        return $data;
+    }
+
     protected function afterSave(): void
     {
-        // Recalculate total whenever the batch is saved
         if ($this->record->isDraft()) {
             $this->record->recalculateTotal();
         }

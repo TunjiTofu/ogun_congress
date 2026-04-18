@@ -72,6 +72,35 @@ class UserResource extends Resource
             Forms\Components\Toggle::make('is_active')
                 ->label('Account Active')
                 ->default(true),
+
+            Forms\Components\Section::make('Church Assignment')
+                ->description('Only required for Church Coordinator role. Editable by Super Admin only.')
+                ->schema([
+                    Forms\Components\Select::make('district_id_for_church')
+                        ->label('District')
+                        ->options(\App\Models\District::orderBy('name')->pluck('name', 'id'))
+                        ->live()
+                        ->afterStateUpdated(fn (\Filament\Forms\Set $set) => $set('church_id', null))
+                        ->dehydrated(false)
+                        ->afterStateHydrated(function ($state, $record, \Filament\Forms\Set $set) {
+                            if ($record?->church_id) {
+                                $church = \App\Models\Church::find($record->church_id);
+                                $set('district_id_for_church', $church?->district_id);
+                            }
+                        }),
+
+                    Forms\Components\Select::make('church_id')
+                        ->label('Church')
+                        ->options(fn (\Filament\Forms\Get $get) =>
+                        \App\Models\Church::where('district_id', $get('district_id_for_church'))
+                            ->orderBy('name')->pluck('name', 'id')
+                        )
+                        ->searchable()
+                        ->nullable()
+                        ->helperText('Assign a church to this coordinator.'),
+                ])
+                ->collapsible()
+                ->columns(2),
         ])->columns(2);
     }
 

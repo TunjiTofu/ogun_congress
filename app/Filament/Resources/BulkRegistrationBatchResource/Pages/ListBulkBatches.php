@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\BulkRegistrationBatchResource\Pages;
 
 use App\Filament\Resources\BulkRegistrationBatchResource;
+use App\Models\BulkRegistrationBatch;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Pages\ListRecords\Tab;
@@ -26,7 +27,7 @@ class ListBulkBatches extends ListRecords
             'draft'           => Tab::make('Draft')->modifyQueryUsing(fn (Builder $q) => $q->where('status', 'draft')),
             'pending_payment' => Tab::make('Pending Payment')
                 ->modifyQueryUsing(fn (Builder $q) => $q->where('status', 'pending_payment'))
-                ->badge(fn () => \App\Models\BulkRegistrationBatch::where('status', 'pending_payment')->count())
+                ->badge(fn () => BulkRegistrationBatch::where('status', 'pending_payment')->count())
                 ->badgeColor('warning'),
             'confirmed'       => Tab::make('Confirmed')->modifyQueryUsing(fn (Builder $q) => $q->where('status', 'confirmed')),
         ];

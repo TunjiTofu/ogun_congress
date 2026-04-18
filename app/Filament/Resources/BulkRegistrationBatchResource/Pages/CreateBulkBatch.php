@@ -13,6 +13,8 @@ class CreateBulkBatch extends CreateRecord
     {
         $data['created_by'] = auth()->id();
         $data['status']     = 'draft';
+        // Remove the UI-only district cascade field — not a real column
+        unset($data['district_id'], $data['district_id_for_church']);
         return $data;
     }
 

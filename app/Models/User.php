@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -19,14 +20,7 @@ class User extends Authenticatable
     use LogsActivity;
     use Notifiable;
 
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'phone',
-        'is_active',
-        'last_login_at',
-    ];
+    protected $guarded = ['id'];
 
     protected $hidden = [
         'password',
@@ -61,6 +55,16 @@ class User extends Authenticatable
     public function registrationCodesCreated(): HasMany
     {
         return $this->hasMany(RegistrationCode::class, 'created_by');
+    }
+
+    public function church(): BelongsTo
+    {
+        return $this->belongsTo(Church::class);
+    }
+
+    public function isChurchCoordinator(): bool
+    {
+        return $this->hasRole('church_coordinator');
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

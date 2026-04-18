@@ -25,25 +25,7 @@ class Camper extends Model implements HasMedia
 
     use HasFactory;
 
-    protected $fillable = [
-        'registration_code_id',
-        'camper_number',
-        'full_name',
-        'phone',
-        'date_of_birth',
-        'gender',
-        'category',
-        'home_address',
-        'church_id',
-        'ministry',
-        'club_rank',
-        'volunteer_role',
-        'photo_path',
-        'badge_color',
-        'id_card_path',
-        'consent_form_path',
-        'consent_collected',
-    ];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {
@@ -71,16 +53,18 @@ class Camper extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('photo')
-             ->singleFile()
-             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
+            ->singleFile()
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp'])
+            ->useDisk('public'); // Public disk so photos are accessible via URL
     }
 
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
-             ->width(400)
-             ->height(400)
-             ->nonQueued();
+            ->width(400)
+            ->height(400)
+            ->performOnCollections('photo')
+            ->nonQueued();
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────
@@ -130,10 +114,10 @@ class Camper extends Model implements HasMedia
     public function scopeConsentOutstanding($query)
     {
         return $query->where('consent_collected', false)
-                     ->whereIn('category', [
-                         CamperCategory::ADVENTURER,
-                         CamperCategory::PATHFINDER,
-                     ]);
+            ->whereIn('category', [
+                CamperCategory::ADVENTURER,
+                CamperCategory::PATHFINDER,
+            ]);
     }
 
     // ── Computed / Helpers ────────────────────────────────────────────────────
@@ -151,7 +135,7 @@ class Camper extends Model implements HasMedia
     public function isCheckedIn(): bool
     {
         return $this->checkinEvents()
-                    ->where('event_type', \App\Enums\CheckinEventType::CHECK_IN)
-                    ->exists();
+            ->where('event_type', \App\Enums\CheckinEventType::CHECK_IN)
+            ->exists();
     }
 }
