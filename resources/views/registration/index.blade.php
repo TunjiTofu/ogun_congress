@@ -74,7 +74,7 @@
                 </div>
 
                 <button type="submit"
-                        :disabled="codeVal.length < 6"
+                        :disabled="codeVal.length < 15"
                         class="w-full mt-6 bg-navy text-white font-bold py-3 rounded-xl
                                hover:bg-steel transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Continue to Registration →

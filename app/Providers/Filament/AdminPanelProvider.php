@@ -14,7 +14,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
 use App\Filament\Pages\AccountantDashboard;
 use App\Filament\Pages\CoordinatorDashboard;
-use Filament\Pages\Dashboard;
+use App\Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -42,7 +42,7 @@ class AdminPanelProvider extends PanelProvider
                 'success' => Color::Green,
                 'info'    => Color::Blue,
             ])
-            ->brandName('Ogun Youth Camp')
+            ->brandName('Ogun Youth Congress')
             ->brandLogo(asset('images/logo.svg'))
             ->brandLogoHeight('2.5rem')
             ->favicon(asset('images/favicon.svg'))

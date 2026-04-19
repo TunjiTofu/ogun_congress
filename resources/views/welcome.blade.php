@@ -416,6 +416,7 @@
         /* ── Mobile ───────────────────────────────────────────────────────── */
         @media (max-width: 768px) {
             .nav-links { display: none; }
+            #contact > .container > div { grid-template-columns: 1fr !important; }
             .nav-links.open { display: flex; flex-direction: column; position: fixed; top: 62px; left: 0; right: 0; background: rgba(11,29,61,0.98); padding: 1.5rem; gap: 1.25rem; border-bottom: 1px solid rgba(201,169,77,0.2); }
             .nav-hamburger { display: flex; }
             .about-grid { grid-template-columns: 1fr; }
@@ -672,34 +673,135 @@
     <div class="container">
         <div class="section-label">Get in Touch</div>
         <h2 class="section-title">Contact Us</h2>
-        <p class="section-subtitle">For registration enquiries, payment questions, or general information.</p>
+        <p class="section-subtitle">Send us a message for registration help, complaints, inquiries, or payment questions.</p>
 
-        <div class="contact-grid">
-            @if(setting('whatsapp_number'))
-                <a href="https://wa.me/{{ preg_replace('/\D/', '', setting('whatsapp_number')) }}"
-                   target="_blank" class="contact-card">
-                    <div class="contact-icon">&#128172;</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:2rem;">
+
+            {{-- Contact info --}}
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                @if(setting('whatsapp_number'))
+                    <a href="https://wa.me/{{ preg_replace('/\D/', '', setting('whatsapp_number')) }}"
+                       target="_blank" class="contact-card">
+                        <div class="contact-icon">&#128172;</div>
+                        <div>
+                            <div class="contact-type">WhatsApp</div>
+                            <div class="contact-value">{{ setting('whatsapp_number') }}</div>
+                        </div>
+                    </a>
+                @endif
+                @if(setting('secretariat_phone'))
+                    <a href="tel:{{ setting('secretariat_phone') }}" class="contact-card">
+                        <div class="contact-icon">&#128222;</div>
+                        <div>
+                            <div class="contact-type">Secretariat</div>
+                            <div class="contact-value">{{ setting('secretariat_phone') }}</div>
+                        </div>
+                    </a>
+                @endif
+                <div class="contact-card" style="cursor:default;">
+                    <div class="contact-icon">&#127760;</div>
                     <div>
-                        <div class="contact-type">WhatsApp</div>
-                        <div class="contact-value">{{ setting('whatsapp_number') }}</div>
+                        <div class="contact-type">SDA Church</div>
+                        <div class="contact-value">Ogun Conference Youth Department</div>
                     </div>
-                </a>
-            @endif
-            @if(setting('secretariat_phone'))
-                <a href="tel:{{ setting('secretariat_phone') }}" class="contact-card">
-                    <div class="contact-icon">&#128222;</div>
-                    <div>
-                        <div class="contact-type">Secretariat</div>
-                        <div class="contact-value">{{ setting('secretariat_phone') }}</div>
-                    </div>
-                </a>
-            @endif
-            <div class="contact-card" style="cursor:default;">
-                <div class="contact-icon">&#127760;</div>
-                <div>
-                    <div class="contact-type">SDA Church</div>
-                    <div class="contact-value">Ogun Conference</div>
                 </div>
+            </div>
+
+            {{-- Message form --}}
+            <div style="background:#fff;border-radius:20px;padding:2rem;box-shadow:0 4px 20px rgba(11,45,107,0.08);border:1px solid rgba(11,45,107,0.07);">
+
+                @if(session('contact_success'))
+                    <div style="background:#D1FAE5;border:1px solid #6EE7B7;border-radius:12px;padding:1rem;
+                        color:#065F46;font-size:0.85rem;margin-bottom:1.2rem;text-align:center;">
+                        &#10003; {{ session('contact_success') }}
+                    </div>
+                @endif
+
+                <h3 style="font-family:'Cinzel',serif;font-size:1rem;color:var(--navy);margin-bottom:1.2rem;">
+                    Send a Message
+                </h3>
+
+                <form action="{{ route('contact.store') }}" method="POST" style="display:flex;flex-direction:column;gap:0.85rem;">
+                    @csrf
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                        <div>
+                            <label style="font-size:0.72rem;font-weight:700;color:#555;text-transform:uppercase;
+                                      letter-spacing:0.06em;display:block;margin-bottom:0.3rem;">
+                                Your Name <span style="color:#DC2626;">*</span>
+                            </label>
+                            <input type="text" name="sender_name" value="{{ old('sender_name') }}" required
+                                   placeholder="Full name"
+                                   style="width:100%;padding:0.7rem 0.9rem;border:1.5px solid #E5E7EB;
+                                      border-radius:10px;font-size:0.85rem;outline:none;
+                                      box-sizing:border-box;font-family:'Lato',sans-serif;"
+                                   onfocus="this.style.borderColor='#0B2D6B'"
+                                   onblur="this.style.borderColor='#E5E7EB'"/>
+                            @error('sender_name')<p style="color:#DC2626;font-size:0.72rem;margin-top:0.2rem;">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label style="font-size:0.72rem;font-weight:700;color:#555;text-transform:uppercase;
+                                      letter-spacing:0.06em;display:block;margin-bottom:0.3rem;">
+                                Phone <span style="color:#DC2626;">*</span>
+                            </label>
+                            <input type="tel" name="sender_phone" value="{{ old('sender_phone') }}" required
+                                   placeholder="08012345678"
+                                   style="width:100%;padding:0.7rem 0.9rem;border:1.5px solid #E5E7EB;
+                                      border-radius:10px;font-size:0.85rem;outline:none;
+                                      box-sizing:border-box;font-family:'Lato',sans-serif;"
+                                   onfocus="this.style.borderColor='#0B2D6B'"
+                                   onblur="this.style.borderColor='#E5E7EB'"/>
+                            @error('sender_phone')<p style="color:#DC2626;font-size:0.72rem;margin-top:0.2rem;">{{ $message }}</p>@enderror
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:0.72rem;font-weight:700;color:#555;text-transform:uppercase;
+                                  letter-spacing:0.06em;display:block;margin-bottom:0.3rem;">
+                            Email <span style="color:#9CA3AF;font-weight:400;">(optional)</span>
+                        </label>
+                        <input type="email" name="sender_email" value="{{ old('sender_email') }}"
+                               placeholder="your@email.com"
+                               style="width:100%;padding:0.7rem 0.9rem;border:1.5px solid #E5E7EB;
+                                  border-radius:10px;font-size:0.85rem;outline:none;
+                                  box-sizing:border-box;font-family:'Lato',sans-serif;"
+                               onfocus="this.style.borderColor='#0B2D6B'"
+                               onblur="this.style.borderColor='#E5E7EB'"/>
+                    </div>
+                    <div>
+                        <label style="font-size:0.72rem;font-weight:700;color:#555;text-transform:uppercase;
+                                  letter-spacing:0.06em;display:block;margin-bottom:0.3rem;">
+                            Category <span style="color:#DC2626;">*</span>
+                        </label>
+                        <select name="category" required
+                                style="width:100%;padding:0.7rem 0.9rem;border:1.5px solid #E5E7EB;
+                                   border-radius:10px;font-size:0.85rem;outline:none;
+                                   box-sizing:border-box;background:#fff;font-family:'Lato',sans-serif;"
+                                onfocus="this.style.borderColor='#0B2D6B'"
+                                onblur="this.style.borderColor='#E5E7EB'">
+                            <option value="">— Select —</option>
+                            <option value="general"   {{ old('category')==='general'   ? 'selected' : '' }}>General Enquiry</option>
+                            <option value="complaint" {{ old('category')==='complaint' ? 'selected' : '' }}>Complaint</option>
+                            <option value="inquiry"   {{ old('category')==='inquiry'   ? 'selected' : '' }}>Inquiry</option>
+                            <option value="payment"   {{ old('category')==='payment'   ? 'selected' : '' }}>Payment Question</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.72rem;font-weight:700;color:#555;text-transform:uppercase;
+                                  letter-spacing:0.06em;display:block;margin-bottom:0.3rem;">
+                            Message <span style="color:#DC2626;">*</span>
+                        </label>
+                        <textarea name="message" required rows="4"
+                                  placeholder="Write your message here..."
+                                  style="width:100%;padding:0.7rem 0.9rem;border:1.5px solid #E5E7EB;
+                                     border-radius:10px;font-size:0.85rem;outline:none;resize:vertical;
+                                     box-sizing:border-box;font-family:'Lato',sans-serif;"
+                                  onfocus="this.style.borderColor='#0B2D6B'"
+                                  onblur="this.style.borderColor='#E5E7EB'">{{ old('message') }}</textarea>
+                        @error('message')<p style="color:#DC2626;font-size:0.72rem;margin-top:0.2rem;">{{ $message }}</p>@enderror
+                    </div>
+                    <button type="submit" class="btn-primary" style="align-self:flex-start;border:none;cursor:pointer;">
+                        Send Message &rarr;
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -770,6 +872,7 @@
     (function() {
         const target = new Date('{{ setting('camp_start_date') }}T00:00:00');
         function pad(n) { return String(n).padStart(2,'0'); }
+        function tick() {
         function tick() {
             const diff = target - new Date();
             if (diff <= 0) {

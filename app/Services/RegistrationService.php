@@ -90,10 +90,22 @@ class RegistrationService
                 ]);
             }
 
-            // ── 2. Compute category from DOB (server-side, never from client) ─
-            $dob      = Carbon::parse($data['date_of_birth']);
-            $age      = $dob->age;
-            $category = CamperCategory::fromAge($age);
+            // ── 2. Determine category ────────────────────────────────────────
+            // Priority: locked category from payment (prefill_category) → form field
+            $lockedCategory = $registrationCode->prefill_category
+                ?? ($data['locked_category'] ?? null)
+                ?? ($data['category_locked'] ?? null);
+
+            if (! $lockedCategory) {
+                throw ValidationException::withMessages([
+                    'code' => 'Registration category could not be determined. Please contact the secretariat.',
+                ]);
+            }
+
+            $category = CamperCategory::from($lockedCategory);
+
+            // DOB is optional — stored if provided but not required for category
+            $dob = ! empty($data['date_of_birth']) ? Carbon::parse($data['date_of_birth']) : null;
 
             // ── 3. Create the Camper record ───────────────────────────────────
             // Full name and phone are always pulled from the registration code —
@@ -103,7 +115,7 @@ class RegistrationService
                 'camper_number'        => $registrationCode->code,
                 'full_name'            => $registrationCode->prefill_name,
                 'phone'                => $registrationCode->prefill_phone,
-                'date_of_birth'        => $data['date_of_birth'],
+                'date_of_birth'        => $data['date_of_birth'] ?? null,
                 'gender'               => $data['gender'],
                 'category'             => $category,
                 'home_address'         => $data['home_address'] ?? null,

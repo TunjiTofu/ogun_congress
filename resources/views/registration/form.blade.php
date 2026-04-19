@@ -18,77 +18,33 @@
     </div>
 </nav>
 
-{{-- Alpine component defined before DOM --}}
 <script>
     const CLUB_RANKS = @json($clubRanks);
 
-    function getAge(dob) {
-        if (!dob) return null;
-        const today = new Date(), birth = new Date(dob);
-        let a = today.getFullYear() - birth.getFullYear();
-        const m = today.getMonth() - birth.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--;
-        return a;
-    }
-    function getCategory(dob) {
-        const age = getAge(dob);
-        if (age === null || age < 6) return null;
-        if (age <= 9)  return 'adventurer';
-        if (age <= 15) return 'pathfinder';
-        return 'senior_youth';
-    }
-
     function wizard() {
-        // prefill_category locks DOB/category if set from payment
         const prefillCategory = '{{ $prefill["prefill_category"] ?? "" }}';
-        const hasPrefillCategory = prefillCategory !== '';
-
         return {
             step: 1,
             totalSteps: 4,
             labels: ['Personal & Church Details','Parent / Guardian','Health Information','Review & Submit'],
             validationError: '',
-            hasPrefillCategory: hasPrefillCategory,
-
-            // If payment set the category, lock it; otherwise derive from DOB
-            dob: '{{ old("date_of_birth","") }}',
-            lockedCategory: prefillCategory,
-
+            category: prefillCategory,
             districtId: '{{ old("district_id","") }}',
             churches: [],
             selectedClubRank: '{{ old("club_rank","") }}',
 
-            get age() { return getAge(this.dob); },
-            get category() {
-                return this.lockedCategory || getCategory(this.dob);
-            },
-            get seniorYouthGroup() {
-                if (this.category !== 'senior_youth') return null;
-                const age = this.lockedCategory ? null : this.age;
-                if (age === null) return 'Ambassador / Young Adults';
-                return age <= 21 ? 'Ambassador (ages 16–21)' : 'Young Adults (ages 22+)';
-            },
-            get categoryDisplay() {
-                const cat = this.category;
-                if (!cat) {
-                    if (!this.dob) return '';
-                    return '<span style="color:#DC2626">&#9888; Age does not meet requirements (minimum age: 6).</span>';
-                }
-                const labels = {adventurer:'Adventurer',pathfinder:'Pathfinder',senior_youth:'Senior Youth'};
-                const label = labels[cat];
-                if (cat === 'senior_youth' && !this.lockedCategory) {
-                    return `Registered as <strong>Senior Youth &ndash; ${this.seniorYouthGroup}</strong>.`;
-                }
-                return `Registered as <strong>${label}</strong>.`;
+            get categoryLabel() {
+                return {adventurer:'Adventurer',pathfinder:'Pathfinder',senior_youth:'Senior Youth'}[this.category] ?? '';
             },
             get needsParent() {
-                const cat = this.category;
-                return cat === 'adventurer' || cat === 'pathfinder';
+                return this.category === 'adventurer' || this.category === 'pathfinder';
             },
             get availableRanks() {
-                const cat = this.category;
-                if (!cat || cat === 'senior_youth') return [];
-                return CLUB_RANKS[cat] ?? [];
+                if (!this.category || this.category === 'senior_youth') return [];
+                return CLUB_RANKS[this.category] ?? [];
+            },
+            get seniorYouthGroup() {
+                return this.category === 'senior_youth' ? '{{ old("club_rank","") }}' || '' : '';
             },
 
             photoPreview: null,
@@ -112,23 +68,26 @@
 
             noHealthIssues: false,
 
-            // Validation
             validateStep1() {
                 this.validationError = '';
-                if (!this.hasPrefillCategory) {
-                    if (!this.dob) { this.validationError = 'Please enter your date of birth.'; return false; }
-                    if (!this.category) { this.validationError = 'Age does not meet camp requirements (minimum age: 6).'; return false; }
-                }
                 if (!document.querySelector('input[name="gender"]:checked')) {
                     this.validationError = 'Please select your gender.'; return false;
                 }
-                const photo = document.getElementById('photo-input');
-                if (!photo?.files.length) { this.validationError = 'Please upload a passport photo.'; return false; }
-                if (!this.districtId) { this.validationError = 'Please select your district.'; return false; }
-                const church = document.querySelector('select[name="church_id"]');
-                if (!church?.value) { this.validationError = 'Please select your church.'; return false; }
+                if (!document.getElementById('photo-input')?.files.length) {
+                    this.validationError = 'Please upload a passport photo.'; return false;
+                }
+                if (!this.districtId) {
+                    this.validationError = 'Please select your district.'; return false;
+                }
+                if (!document.querySelector('select[name="church_id"]')?.value) {
+                    this.validationError = 'Please select your church.'; return false;
+                }
                 if (this.availableRanks.length > 0 && !this.selectedClubRank) {
-                    this.validationError = 'Please select your club rank.'; return false;
+                    this.validationError = 'Please select your club rank / class.'; return false;
+                }
+                if (this.category === 'senior_youth') {
+                    const srGroup = document.querySelector('select[name="club_rank"]')?.value;
+                    if (!srGroup) { this.validationError = 'Please select your Senior Youth group.'; return false; }
                 }
                 return true;
             },
@@ -187,10 +146,9 @@
         <p class="text-xs text-gray-400 mb-3">Fields marked <span class="text-red-500 font-bold">*</span> are compulsory.</p>
 
         {{-- Front-end validation error --}}
-        <div x-show="validationError"
-             class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-start gap-2"
-             style="display:none;">
-            <span class="font-bold">&#9888;</span>
+        <div x-show="validationError" style="display:none"
+             class="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm flex items-start gap-2">
+            <span class="font-bold flex-shrink-0">&#9888;</span>
             <span x-text="validationError"></span>
         </div>
 
@@ -206,26 +164,29 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('registration.submit-web') }}" enctype="multipart/form-data" novalidate>
+        <form method="POST" action="{{ route('registration.submit-web') }}"
+              enctype="multipart/form-data" novalidate>
             @csrf
             <input type="hidden" name="code" value="{{ $code }}"/>
-            {{-- Pass locked category if pre-filled from payment --}}
-            @if(!empty($prefill['prefill_category']))
-                <input type="hidden" name="locked_category" value="{{ $prefill['prefill_category'] }}"/>
-            @endif
+            <input type="hidden" name="category_locked" value="{{ $prefill['prefill_category'] ?? '' }}"/>
 
-            {{-- ══ STEP 1: Personal + Church ══ --}}
+            {{-- ══ STEP 1 ══ --}}
             <div x-show="step === 1" class="space-y-5">
 
-                {{-- Payment summary --}}
+                {{-- Payment & Category Summary --}}
                 <div class="bg-white rounded-2xl shadow-sm p-5">
-                    <h2 class="font-bold text-navy text-base mb-3">Payment Details</h2>
+                    <h2 class="font-bold text-navy text-base mb-3">Your Registration Details</h2>
                     <div class="grid grid-cols-2 gap-3">
                         @foreach([
                             ['Full Name',      $prefill['prefill_name']],
                             ['Phone',          $prefill['prefill_phone']],
+                            ['Department',     match($prefill['prefill_category'] ?? '') {
+                                'adventurer'   => 'Adventurer Club',
+                                'pathfinder'   => 'Pathfinder Club',
+                                'senior_youth' => 'Senior Youth (SYL)',
+                                default        => '—'
+                            }],
                             ['Amount Paid',    '&#8358;'.number_format((float)($prefill['amount_paid']??0))],
-                            ['Payment Method', $prefill['payment_type']],
                         ] as [$l,$v])
                             <div class="bg-gray-50 rounded-xl p-3">
                                 <p class="text-xs text-gray-400 uppercase tracking-wide mb-0.5">{{ $l }}</p>
@@ -239,36 +200,6 @@
                 <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
                     <h2 class="font-bold text-navy text-base">Personal Information</h2>
 
-                    {{-- Category display (if locked from payment) --}}
-                    @if(!empty($prefill['prefill_category']))
-                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                            <p class="text-xs text-blue-600 font-semibold uppercase tracking-wide mb-0.5">Your Department</p>
-                            <p class="font-bold text-navy text-sm" x-text="categoryDisplay" x-html="categoryDisplay"></p>
-                        </div>
-                        {{-- Hidden fields so server gets the category --}}
-                        <input type="hidden" name="category_locked" value="{{ $prefill['prefill_category'] }}"/>
-                    @endif
-
-                    {{-- Date of Birth — always required --}}
-                    <div>
-                        <label for="dob" class="block text-sm font-medium text-gray-700 mb-1">
-                            Date of Birth <span class="text-red-500">*</span>
-                        </label>
-                        <input type="date" name="date_of_birth" id="dob"
-                               value="{{ old('date_of_birth') }}"
-                               max="{{ now()->subYears(6)->format('Y-m-d') }}"
-                               min="{{ now()->subYears(100)->format('Y-m-d') }}"
-                               x-model="dob"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
-                                  focus:outline-none focus:ring-2 focus:ring-navy
-                                  @error('date_of_birth') border-red-400 @enderror"/>
-                        <p class="text-xs text-gray-400 mt-1">You can type the date directly or use the picker.</p>
-                        {{-- Only show live category derivation when category is not already locked --}}
-                        <p class="text-sm mt-2 font-medium text-navy"
-                           x-show="dob && !hasPrefillCategory" x-html="categoryDisplay"></p>
-                        @error('date_of_birth')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
-                    </div>
-
                     {{-- Gender --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Gender <span class="text-red-500">*</span></label>
@@ -281,39 +212,48 @@
                                 </label>
                             @endforeach
                         </div>
+                        @error('gender')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
 
                     {{-- Photo with preview --}}
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Passport Photo <span class="text-red-500">*</span></label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Passport Photo <span class="text-red-500">*</span>
+                        </label>
                         <div x-show="photoPreview" class="mb-3">
                             <div class="relative inline-block">
-                                <img :src="photoPreview" class="w-28 h-28 object-cover rounded-xl border-2 border-navy shadow-sm"/>
+                                <img :src="photoPreview"
+                                     class="w-28 h-28 object-cover rounded-xl border-2 border-navy shadow-sm"/>
                                 <button type="button" @click="removePhoto()"
-                                        class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs
-                                           flex items-center justify-center hover:bg-red-600">&#10005;</button>
+                                        class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white
+                                           rounded-full text-xs flex items-center justify-center hover:bg-red-600">
+                                    &#10005;
+                                </button>
                             </div>
                             <p class="text-xs text-gray-500 mt-1">
-                                <button type="button" @click="$refs.photoInput.click()" class="text-navy underline">Change photo</button>
+                                <button type="button" @click="$refs.photoInput.click()"
+                                        class="text-navy underline">Change photo</button>
                             </p>
                         </div>
                         <div x-show="!photoPreview" @click="$refs.photoInput.click()"
-                             class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-navy transition">
+                             class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center
+                                cursor-pointer hover:border-navy transition">
                             <div class="text-3xl mb-1">&#128247;</div>
                             <p class="text-sm font-medium text-gray-700">Click to upload photo</p>
-                            <p class="text-xs text-gray-400 mt-0.5">JPG or PNG &middot; max 2MB</p>
+                            <p class="text-xs text-gray-400 mt-0.5">JPG or PNG &middot; max 2MB &middot; will appear on ID card</p>
                         </div>
                         <input type="file" name="photo" id="photo-input" x-ref="photoInput"
-                               accept="image/jpeg,image/png,image/webp" required class="hidden"
+                               accept="image/jpeg,image/png,image/webp" class="hidden"
                                @change="handlePhoto($event)"/>
                         @error('photo')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
 
-                    {{-- Address --}}
+                    {{-- Home Address --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Home Address</label>
                         <textarea name="home_address" rows="2" placeholder="Optional"
-                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy">{{ old('home_address') }}</textarea>
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
+                                     focus:outline-none focus:ring-2 focus:ring-navy">{{ old('home_address') }}</textarea>
                     </div>
                 </div>
 
@@ -321,11 +261,11 @@
                 <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
                     <h2 class="font-bold text-navy text-base">Church &amp; Ministry</h2>
 
-                    {{-- District --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">District <span class="text-red-500">*</span></label>
                         <select x-model="districtId" @change="loadChurches()"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy">
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                                   focus:outline-none focus:ring-2 focus:ring-navy">
                             <option value="">— Select District —</option>
                             @foreach($districts as $district)
                                 <option value="{{ $district->id }}" {{ old('district_id')==$district->id ? 'selected' : '' }}>
@@ -335,11 +275,12 @@
                         </select>
                     </div>
 
-                    {{-- Church --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Church <span class="text-red-500">*</span></label>
                         <select name="church_id"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy @error('church_id') border-red-400 @enderror">
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                                   focus:outline-none focus:ring-2 focus:ring-navy
+                                   @error('church_id') border-red-400 @enderror">
                             <option value="">— Select District first —</option>
                             <template x-for="church in churches" :key="church.id">
                                 <option :value="church.id" x-text="church.name"
@@ -349,52 +290,50 @@
                         @error('church_id')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
 
-                    {{-- Ministry (auto from DOB or locked) --}}
-                    <div x-show="category && category !== 'senior_youth'">
+                    {{-- Ministry (auto from category — read only) --}}
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Ministry / Club</label>
                         <input type="text" name="ministry"
-                               :value="category === 'adventurer' ? 'Adventurers' : category === 'pathfinder' ? 'Pathfinders' : ''"
+                               :value="category === 'adventurer' ? 'Adventurers' :
+                                   category === 'pathfinder'  ? 'Pathfinders'  : 'Senior Youth'"
                                readonly
-                               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600"/>
-                        <p class="text-xs text-gray-400 mt-1">Set automatically from your age.</p>
-                    </div>
-                    <div x-show="category === 'senior_youth'">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Ministry / Club</label>
-                        <input type="text" name="ministry" value="Senior Youth" readonly
-                               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600"/>
+                               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm
+                                  bg-gray-50 text-gray-600"/>
                     </div>
 
-                    {{-- Senior Youth Group (auto) --}}
-                    <div x-show="category === 'senior_youth' && !hasPrefillCategory">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Senior Youth Group</label>
-                        <input type="text" name="club_rank" :value="seniorYouthGroup" readonly
-                               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600"/>
-                        <p class="text-xs text-gray-400 mt-1">Ambassador (16–21) &bull; Young Adults (22+) — set from date of birth.</p>
-                    </div>
-
-                    {{-- Senior Youth Group (when locked from payment — must still choose) --}}
-                    <div x-show="category === 'senior_youth' && hasPrefillCategory">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Senior Youth Group <span class="text-red-500">*</span></label>
-                        <select name="club_rank"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy">
-                            <option value="">— Select —</option>
-                            <option value="Ambassador" {{ old('club_rank')==='Ambassador' ? 'selected' : '' }}>Ambassador (Ages 16–21)</option>
-                            <option value="Young Adults" {{ old('club_rank')==='Young Adults' ? 'selected' : '' }}>Young Adults (Ages 22+)</option>
-                        </select>
-                    </div>
-
-                    {{-- Club Rank (Adventurers & Pathfinders) --}}
+                    {{-- Club Rank — Adventurers & Pathfinders --}}
                     <div x-show="availableRanks.length > 0">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Club Rank / Class <span class="text-red-500">*</span>
                         </label>
                         <select name="club_rank" x-model="selectedClubRank"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy">
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                                   focus:outline-none focus:ring-2 focus:ring-navy">
                             <option value="">— Select your rank —</option>
                             <template x-for="rank in availableRanks" :key="rank">
-                                <option :value="rank" x-text="rank" :selected="rank === selectedClubRank"></option>
+                                <option :value="rank" x-text="rank"
+                                        :selected="rank === selectedClubRank"></option>
                             </template>
                         </select>
+                    </div>
+
+                    {{-- Senior Youth Group --}}
+                    <div x-show="category === 'senior_youth'">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Senior Youth Group <span class="text-red-500">*</span>
+                        </label>
+                        <select name="club_rank"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                                   focus:outline-none focus:ring-2 focus:ring-navy">
+                            <option value="">— Select —</option>
+                            <option value="Ambassador" {{ old('club_rank')==='Ambassador' ? 'selected' : '' }}>
+                                Ambassador (Ages 16–21)
+                            </option>
+                            <option value="Young Adults" {{ old('club_rank')==='Young Adults' ? 'selected' : '' }}>
+                                Young Adults (Ages 22+)
+                            </option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">Ambassador (16–21 years) &bull; Young Adults (22 years and above)</p>
                     </div>
                 </div>
             </div>
@@ -406,13 +345,15 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
                     <input type="text" name="parent_name" value="{{ old('parent_name') }}"
-                           class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy @error('parent_name') border-red-400 @enderror"/>
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
+                              focus:outline-none focus:ring-2 focus:ring-navy @error('parent_name') border-red-400 @enderror"/>
                     @error('parent_name')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Relationship <span class="text-red-500">*</span></label>
                     <select name="parent_relationship"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-navy">
+                            class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                               focus:outline-none focus:ring-2 focus:ring-navy">
                         <option value="">— Select —</option>
                         @foreach(['Mother','Father','Guardian','Uncle','Aunt','Grandparent','Pastor'] as $rel)
                             <option value="{{ $rel }}" {{ old('parent_relationship')===$rel ? 'selected' : '' }}>{{ $rel }}</option>
@@ -421,14 +362,17 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number <span class="text-red-500">*</span></label>
-                    <input type="tel" name="parent_phone" value="{{ old('parent_phone') }}" placeholder="08012345678"
-                           class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy @error('parent_phone') border-red-400 @enderror"/>
+                    <input type="tel" name="parent_phone" value="{{ old('parent_phone') }}"
+                           placeholder="08012345678"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
+                              focus:outline-none focus:ring-2 focus:ring-navy @error('parent_phone') border-red-400 @enderror"/>
                     @error('parent_phone')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-gray-400 text-xs">(optional)</span></label>
                     <input type="email" name="parent_email" value="{{ old('parent_email') }}"
-                           class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy"/>
+                           class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
+                              focus:outline-none focus:ring-2 focus:ring-navy"/>
                 </div>
             </div>
 
@@ -445,14 +389,15 @@
                 </label>
                 <div x-show="!noHealthIssues" class="space-y-4">
                     @foreach([
-                        ['medical_conditions','Medical Conditions','e.g. Asthma, Diabetes, Epilepsy'],
+                        ['medical_conditions','Medical Conditions','e.g. Asthma, Diabetes, Epilepsy, Sickle Cell'],
                         ['medications','Current Medications','Medication name and dosage'],
-                        ['allergies','Allergies','e.g. Penicillin, Peanuts'],
+                        ['allergies','Allergies','e.g. Penicillin, Peanuts, Dust'],
                     ] as [$name,$label,$ph])
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ $label }}</label>
                             <textarea name="{{ $name }}" rows="2" placeholder="{{ $ph }}"
-                                      class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy">{{ old($name) }}</textarea>
+                                      class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
+                                     focus:outline-none focus:ring-2 focus:ring-navy">{{ old($name) }}</textarea>
                         </div>
                     @endforeach
                 </div>
@@ -468,10 +413,13 @@
                 </div>
                 <label class="flex items-start gap-3 cursor-pointer">
                     <input type="checkbox" name="confirm_accuracy" required class="mt-1 text-navy"/>
-                    <span class="text-sm text-gray-700">I confirm that all information provided is accurate and complete.</span>
+                    <span class="text-sm text-gray-700">
+                    I confirm that all information provided is accurate and complete.
+                </span>
                 </label>
                 <button type="submit"
-                        class="w-full bg-green-600 text-white font-bold py-4 rounded-xl text-lg hover:bg-green-700 transition">
+                        class="w-full bg-green-600 text-white font-bold py-4 rounded-xl text-lg
+                           hover:bg-green-700 transition">
                     Submit Registration &#10003;
                 </button>
             </div>
@@ -479,7 +427,8 @@
             {{-- Navigation --}}
             <div class="flex gap-3 mt-4">
                 <button type="button" @click="prev()" x-show="step > 1"
-                        class="flex-1 border border-gray-300 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-100 transition">
+                        class="flex-1 border border-gray-300 text-gray-700 font-semibold py-3
+                           rounded-xl hover:bg-gray-100 transition">
                     &larr; Back
                 </button>
                 <button type="button" @click="next()" x-show="step < totalSteps"

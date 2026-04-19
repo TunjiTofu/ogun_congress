@@ -1,69 +1,94 @@
 <?php
 
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\RegistrationController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
-// ── Landing page ───────────────────────────────────────────────────────────────
-Route::get('/', fn () => view('welcome'))->name('home');
+use App\Http\Controllers\{
+    PaymentController,
+    RegistrationController,
+    ContactController,
+    CamperPortalController
+};
+use App\Models\Church;
 
-// ── Registration ───────────────────────────────────────────────────────────────
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
+// ── Landing ─────────────────────────────────────────────────────────────
+Route::view('/', 'welcome')->name('home');
+
+
+// ── Registration Module ─────────────────────────────────────────────────
 Route::prefix('registration')->name('registration.')->group(function () {
 
-    // Code entry
-    Route::get('/', fn () => view('registration.index'))->name('index');
+    Route::view('/', 'registration.index')->name('index');
 
-    // Validate code and redirect to form (web form POST)
-    Route::post('/validate', [RegistrationController::class, 'validateCodeWeb'])->name('validate-code-web');
+    Route::controller(RegistrationController::class)->group(function () {
+        Route::post('/validate', 'validateCodeWeb')->name('validate-code-web');
+        Route::get('/form/{code}', 'form')->name('form');
+        Route::post('/submit', 'submitWeb')->name('submit-web');
+        Route::get('/success/{code}', 'success')->name('success');
+    });
 
-    // Online payment form
-    Route::get('/pay-online', fn () => view('registration.pay-online'))->name('pay-online');
-    Route::post('/pay-online', [PaymentController::class, 'initiateWeb'])->name('payment.initiate-web');
+    Route::controller(PaymentController::class)->group(function () {
+        Route::view('/pay-online', 'registration.pay-online')->name('pay-online');
+        Route::post('/pay-online', 'initiateWeb')->name('payment.initiate-web');
+    });
 
-    // Paystack callback page
-    Route::get('/callback', fn () => view('registration.callback'))->name('callback');
-
-    // Registration wizard (requires valid code passed as route param)
-    Route::get('/form/{code}', [RegistrationController::class, 'form'])->name('form');
-
-    // Form submission
-    Route::post('/submit', [RegistrationController::class, 'submitWeb'])->name('submit-web');
-
-    // Success / download page
-    Route::get('/success/{code}', [RegistrationController::class, 'success'])->name('success');
+    Route::view('/callback', 'registration.callback')->name('callback');
 });
 
-// ── Churches API for cascading dropdown ───────────────────────────────────────
-Route::get('/api/churches', function () {
-    $districtId = request('district_id');
-    return \App\Models\Church::where('district_id', $districtId)
-        ->orderBy('name')
-        ->get(['id', 'name']);
+
+// ── Lightweight APIs ────────────────────────────────────────────────────
+Route::prefix('api')->group(function () {
+
+    Route::get('/churches', function () {
+        return Church::query()
+            ->where('district_id', request('district_id'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    });
 });
 
-// ── Camper Self-Service Portal ─────────────────────────────────────────────────
-Route::prefix('portal')->name('portal.')->group(function () {
-    Route::get('/',        [App\Http\Controllers\CamperPortalController::class, 'index'])->name('index');
-    Route::post('/login',  [App\Http\Controllers\CamperPortalController::class, 'login'])->name('login');
-    Route::get('/dashboard', [App\Http\Controllers\CamperPortalController::class, 'dashboard'])->name('dashboard');
-    Route::post('/logout', [App\Http\Controllers\CamperPortalController::class, 'logout'])->name('logout');
+
+// ── Contact ─────────────────────────────────────────────────────────────
+Route::post('/contact', [ContactController::class, 'store'])
+    ->name('contact.store');
+
+
+// ── Camper Portal ───────────────────────────────────────────────────────
+Route::prefix('portal')->name('portal.')->controller(CamperPortalController::class)->group(function () {
+    Route::get('/', 'index')->name('index');
+    Route::post('/login', 'login')->name('login');
+    Route::get('/dashboard', 'dashboard')->name('dashboard');
+    Route::post('/logout', 'logout')->name('logout');
 });
+
+
+// ── Documents ───────────────────────────────────────────────────────────
 Route::get('/documents/download/{path}', function (string $path) {
     $filePath = base64_decode($path);
 
-    if (! Storage::disk('private')->exists($filePath)) {
-        abort(404, 'Document not found.');
-    }
+    abort_unless(
+        Storage::disk('private')->exists($filePath),
+        404,
+        'Document not found.'
+    );
 
-    $fullPath = storage_path('app/private/' . $filePath);
-    $filename = basename($filePath);
-
-    return response()->file($fullPath, [
-        'Content-Type'        => 'application/pdf',
-        'Content-Disposition' => "inline; filename=\"{$filename}\"",
-    ]);
+    return response()->file(
+        storage_path("app/private/{$filePath}"),
+        [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . basename($filePath) . '"',
+        ]
+    );
 })->name('documents.download');
-Route::get('/checkin/{any?}', fn () => view('pwa.checkin'))
+
+
+// ── PWA Check-in App ────────────────────────────────────────────────────
+Route::view('/checkin/{any?}', 'pwa.checkin')
     ->where('any', '.*')
     ->name('checkin.app');

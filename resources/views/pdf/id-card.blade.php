@@ -1,47 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8"/>
     <style>
+        @page {
+            margin: 0;
+            size: 85.6mm 53.98mm;
+            page-break-after: avoid;
+            page-break-inside: avoid;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
+        html {
             font-family: DejaVu Sans, Arial, sans-serif;
             font-size: 7pt;
-            color: #1A1A1A;
             width: 85.6mm;
             height: 53.98mm;
             overflow: hidden;
         }
+        body {
+            width: 85.6mm;
+            height: 53.98mm;
+            overflow: hidden;
+            page-break-inside: avoid;
+            page-break-after: avoid;
+        }
+        .card {
+            width: 85.6mm;
+            height: 53.98mm;
+            overflow: hidden;
+            position: relative;
+            background: #FFFFFF;
+        }
 
-        /* Top colour band */
-        .header-band {
-            background-color: {{ $badgeColor }};
-            height: 8mm;
+        /* ── Top colour band ─────────────────────────────────────────── */
+        .header {
+            background: {{ $badgeColor }};
+            height: 8.5mm;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 3mm;
+            padding: 0 2.5mm;
         }
-
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 1.5mm;
+        }
+        .logo {
+            width: 6mm;
+            height: 6mm;
+            border-radius: 50%;
+            border: 0.4pt solid rgba(255,255,255,0.6);
+            object-fit: cover;
+        }
         .camp-name {
             color: #FFFFFF;
-            font-size: 7pt;
+            font-size: 6pt;
             font-weight: bold;
             letter-spacing: 0.3pt;
             text-transform: uppercase;
+            line-height: 1.2;
         }
-
+        .camp-sub {
+            color: rgba(255,255,255,0.8);
+            font-size: 4.5pt;
+            letter-spacing: 0.2pt;
+        }
         .camp-year {
             color: rgba(255,255,255,0.85);
             font-size: 6pt;
+            font-weight: bold;
         }
 
-        /* Main card body */
-        .card-body {
+        /* ── Body ──────────────────────────────────────────────────────── */
+        .body {
             display: flex;
-            height: 40mm;
-            padding: 2mm;
+            height: 37mm;
+            padding: 2mm 2mm 1.5mm 2mm;
             gap: 2mm;
         }
 
@@ -49,202 +84,208 @@
         .photo-col {
             width: 20mm;
             flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1mm;
         }
-
-        .photo-wrap {
-            width: 18mm;
-            height: 21mm;
-            border: 0.5pt solid #CCCCCC;
-            border-radius: 1mm;
+        .photo-box {
+            width: 20mm;
+            height: 24mm;
+            border: 0.5pt solid #D0D0D0;
+            border-radius: 1.5mm;
             overflow: hidden;
-            background: #F0F0F0;
+            background: #F5F5F5;
         }
-
-        .photo-wrap img {
+        .photo-box img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            object-position: top center;
         }
-
-        .photo-placeholder {
+        .no-photo {
             width: 100%;
             height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 5pt;
             color: #AAAAAA;
-            font-size: 6pt;
+            text-align: center;
         }
 
-        /* Right: camper details */
-        .details-col {
+        /* Middle: details */
+        .info-col {
             flex: 1;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            overflow: hidden;
         }
-
         .camper-name {
             font-size: 9pt;
             font-weight: bold;
-            color: #1B3A6B;
+            color: #0B2D6B;
+            line-height: 1.15;
+            word-wrap: break-word;
+            max-width: 35mm;
+        }
+        .code {
+            font-family: DejaVu Sans Mono, monospace;
+            font-size: 5.5pt;
+            color: #666666;
+            letter-spacing: 0.4pt;
+            margin-top: 0.8mm;
+        }
+        .badge {
+            display: inline-block;
+            background: {{ $badgeColor }};
+            color: #FFFFFF;
+            font-size: 5pt;
+            font-weight: bold;
+            padding: 0.5mm 1.8mm;
+            border-radius: 2pt;
+            text-transform: uppercase;
+            letter-spacing: 0.3pt;
+            margin-top: 1.2mm;
+        }
+        .detail-section { margin-top: 2mm; }
+        .detail-row { margin-bottom: 1mm; }
+        .detail-lbl {
+            font-size: 4.5pt;
+            color: #999999;
+            text-transform: uppercase;
+            letter-spacing: 0.2pt;
+            line-height: 1;
+        }
+        .detail-val {
+            font-size: 6pt;
+            font-weight: bold;
+            color: #1A1A1A;
             line-height: 1.2;
-            word-break: break-word;
+            word-wrap: break-word;
         }
 
-        .camper-number {
-            font-family: DejaVu Sans Mono, Courier New, monospace;
-            font-size: 7pt;
-            color: #555555;
-            letter-spacing: 0.5pt;
-            margin-top: 0.5mm;
-        }
-
-        .detail-row {
+        /* Right: QR code */
+        .qr-col {
+            width: 17mm;
+            flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            margin-top: 1mm;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 1mm;
+        }
+        .qr-box {
+            width: 17mm;
+            height: 17mm;
+            overflow: hidden;
+        }
+        .qr-box svg {
+            width: 17mm !important;
+            height: 17mm !important;
+            display: block;
+        }
+        .qr-box img {
+            width: 17mm;
+            height: 17mm;
+            display: block;
+        }
+        .qr-lbl {
+            font-size: 4pt;
+            color: #AAAAAA;
+            text-align: center;
+            margin-top: 0.8mm;
+            letter-spacing: 0.2pt;
         }
 
-        .detail-label {
-            font-size: 5pt;
-            color: #888888;
-            text-transform: uppercase;
-            letter-spacing: 0.3pt;
-        }
-
-        .detail-value {
-            font-size: 6.5pt;
-            color: #1A1A1A;
-            font-weight: bold;
-        }
-
-        /* Category badge */
-        .category-badge {
-            display: inline-block;
-            background-color: {{ $badgeColor }};
-            color: #FFFFFF;
-            font-size: 5.5pt;
-            font-weight: bold;
-            padding: 0.5mm 2mm;
-            border-radius: 5pt;
-            text-transform: uppercase;
-            letter-spacing: 0.3pt;
-            margin-top: 1mm;
-        }
-
-        /* QR code + footer */
-        .footer-band {
-            background-color: #F8F8F8;
-            border-top: 0.5pt solid #EEEEEE;
-            height: 6mm;
+        /* ── Footer band ─────────────────────────────────────────────── */
+        .footer {
+            height: 8.5mm;
+            background: {{ $badgeColor }}1A;
+            border-top: 0.5pt solid {{ $badgeColor }}55;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 2mm;
+            padding: 0 2.5mm;
         }
-
-        .qr-section {
-            width: 12mm;
-        }
-
-        .qr-section svg {
-            width: 12mm;
-            height: 12mm;
-        }
-
-        .footer-text {
-            font-size: 5pt;
-            color: #AAAAAA;
-            text-align: right;
-        }
-
-        /* Inline QR in body */
-        .qr-inline {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: auto;
-        }
-
-        .qr-inline svg {
-            width: 14mm;
-            height: 14mm;
-        }
-
-        .qr-label {
+        .footer-txt {
             font-size: 4.5pt;
-            color: #AAAAAA;
-            margin-top: 0.5mm;
+            color: #777777;
+            letter-spacing: 0.2pt;
         }
     </style>
 </head>
 <body>
+<div class="card">
 
-    {{-- Top band --}}
-    <div class="header-band">
-        <span class="camp-name">{{ $campName }}</span>
-        <span class="camp-year">{{ $campYear }}</span>
+    {{-- Header --}}
+    <div class="header">
+        <div class="header-brand">
+            @php $logoPath = public_path('images/logo.svg'); @endphp
+            @if(file_exists($logoPath))
+                <img src="data:image/svg+xml;base64,{{ base64_encode(file_get_contents($logoPath)) }}"
+                     class="logo" alt="Logo"/>
+            @endif
+            <div>
+                <div class="camp-name">{{ $campName }}</div>
+                <div class="camp-sub">SDA Church &mdash; Ogun Conference</div>
+            </div>
+        </div>
+        <div class="camp-year">{{ $campYear }}</div>
     </div>
 
-    {{-- Card body --}}
-    <div class="card-body">
+    {{-- Body --}}
+    <div class="body">
 
         {{-- Photo --}}
         <div class="photo-col">
-            <div class="photo-wrap">
+            <div class="photo-box">
                 @if($photoBase64)
-                    <img src="{{ $photoBase64 }}" alt="Camper photo" />
+                    <img src="{{ $photoBase64 }}" alt="Photo"/>
                 @else
-                    <div class="photo-placeholder">No Photo</div>
+                    <div class="no-photo">No Photo</div>
                 @endif
-            </div>
-
-            {{-- QR code beneath photo --}}
-            <div class="qr-inline">
-                {!! $qrCode !!}
-                <span class="qr-label">Scan to verify</span>
             </div>
         </div>
 
-        {{-- Details --}}
-        <div class="details-col">
+        {{-- Info --}}
+        <div class="info-col">
             <div>
                 <div class="camper-name">{{ $camper->full_name }}</div>
-                <div class="camper-number">{{ $camper->camper_number }}</div>
-                <div class="category-badge">{{ $camper->category->label() }}</div>
+                <div class="code">{{ $camper->camper_number }}</div>
+                <div class="badge">{{ $camper->category->label() }}</div>
             </div>
-
-            <div>
+            <div class="detail-section">
                 <div class="detail-row">
-                    <span class="detail-label">Church</span>
-                    <span class="detail-value">{{ $camper->church?->name ?? '—' }}</span>
+                    <div class="detail-lbl">Church</div>
+                    <div class="detail-val">{{ $camper->church?->name ?? '—' }}</div>
                 </div>
-
                 <div class="detail-row">
-                    <span class="detail-label">District</span>
-                    <span class="detail-value">{{ $camper->church?->district?->name ?? '—' }}</span>
+                    <div class="detail-lbl">District</div>
+                    <div class="detail-val">{{ $camper->church?->district?->name ?? '—' }}</div>
                 </div>
-
-                @if($camper->ministry)
-                <div class="detail-row">
-                    <span class="detail-label">Ministry</span>
-                    <span class="detail-value">{{ $camper->ministry }}</span>
-                </div>
+                @if($camper->club_rank)
+                    <div class="detail-row">
+                        <div class="detail-lbl">Rank</div>
+                        <div class="detail-val">{{ $camper->club_rank }}</div>
+                    </div>
                 @endif
             </div>
         </div>
+
+        {{-- QR code --}}
+        <div class="qr-col">
+            <div class="qr-box">
+                {!! $qrCode !!}
+            </div>
+            <div class="qr-lbl">Scan to verify</div>
+        </div>
+
     </div>
 
     {{-- Footer --}}
-    <div class="footer-band">
-        <span class="footer-text">SDA Church — Ogun Conference</span>
-        <span class="footer-text">Valid for {{ $campYear }} only</span>
+    <div class="footer">
+        <span class="footer-txt">Seventh-day Adventist Church</span>
+        <span class="footer-txt">Valid {{ $campYear }}</span>
     </div>
 
+</div>
 </body>
 </html>

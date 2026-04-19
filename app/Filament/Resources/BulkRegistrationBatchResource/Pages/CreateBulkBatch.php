@@ -9,12 +9,37 @@ class CreateBulkBatch extends CreateRecord
 {
     protected static string $resource = BulkRegistrationBatchResource::class;
 
+    /**
+     * Pre-fill church_id from the coordinator's assigned church.
+     * This runs before the form is displayed.
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $user = auth()->user();
+        if ($user->hasRole('church_coordinator') && $user->church_id) {
+            $data['church_id'] = $user->church_id;
+            // Also set the district cascade field for display
+            $church = \App\Models\Church::find($user->church_id);
+            if ($church) {
+                $data['district_id'] = $church->district_id;
+            }
+        }
+        return $data;
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['created_by'] = auth()->id();
+        $user = auth()->user();
+        $data['created_by'] = $user->id;
         $data['status']     = 'draft';
-        // Remove the UI-only district cascade field — not a real column
-        unset($data['district_id'], $data['district_id_for_church']);
+
+        // Auto-set church from coordinator if not set
+        if ($user->hasRole('church_coordinator') && $user->church_id && empty($data['church_id'])) {
+            $data['church_id'] = $user->church_id;
+        }
+
+        // Strip UI-only and relationship fields
+        unset($data['district_id'], $data['district_id_for_church'], $data['entries']);
         return $data;
     }
 

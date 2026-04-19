@@ -20,7 +20,12 @@ class EditBulkBatch extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        unset($data['district_id'], $data['district_id_for_church']);
+        // Coordinator: always enforce their church
+        if (auth()->user()->hasRole('church_coordinator')) {
+            $data['church_id'] = auth()->user()->church_id;
+        }
+        unset($data['district_id'], $data['district_id_for_church'], $data['entries'],
+            $data['church_display'], $data['district_display']);
         return $data;
     }
 

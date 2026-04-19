@@ -36,7 +36,8 @@ class BulkRegistrationBatchResource extends Resource
 
             Forms\Components\Section::make('Batch Details')
                 ->schema([
-                    // Cascading district → church
+                    // Coordinator: church is auto-set from their profile (read-only)
+                    // Super admin / accountant: can select
                     Forms\Components\Select::make('district_id')
                         ->label('District')
                         ->options(District::orderBy('name')->pluck('name', 'id'))
@@ -44,6 +45,7 @@ class BulkRegistrationBatchResource extends Resource
                         ->afterStateUpdated(fn (Set $set) => $set('church_id', null))
                         ->required()
                         ->dehydrated(false)
+                        ->hidden(fn () => auth()->user()->hasRole('church_coordinator'))
                         ->disabled(fn ($record) => $record && ! $record->isDraft()),
 
                     Forms\Components\Select::make('church_id')
@@ -52,10 +54,23 @@ class BulkRegistrationBatchResource extends Resource
                             ->orderBy('name')->pluck('name', 'id'))
                         ->required()
                         ->searchable()
+                        ->hidden(fn () => auth()->user()->hasRole('church_coordinator'))
                         ->disabled(fn ($record) => $record && ! $record->isDraft()),
+
+                    // Read-only church display for coordinators
+                    Forms\Components\Placeholder::make('church_display')
+                        ->label('Your Church')
+                        ->content(fn () => auth()->user()->church?->name ?? '—')
+                        ->visible(fn () => auth()->user()->hasRole('church_coordinator')),
+
+                    Forms\Components\Placeholder::make('district_display')
+                        ->label('District')
+                        ->content(fn () => auth()->user()->church?->district?->name ?? '—')
+                        ->visible(fn () => auth()->user()->hasRole('church_coordinator')),
 
                     Forms\Components\Textarea::make('notes')
                         ->rows(2)
+                        ->columnSpanFull()
                         ->disabled(fn ($record) => $record && ! $record->isDraft()),
                 ])->columns(2),
 
