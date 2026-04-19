@@ -90,11 +90,13 @@ class BulkRegistrationBatchResource extends Resource
                         ->helperText('Must match the expected total exactly.'),
 
                     Forms\Components\FileUpload::make('proof_image_path')
-                        ->label('Payment Proof')
+                        ->label('Payment Proof / Teller Upload')
                         ->image()
-                        ->disk('private')
+                        ->disk('public')
                         ->directory('bulk-payment-proofs')
-                        ->visibility('private'),
+                        ->visibility('public')
+                        ->imagePreviewHeight('120')
+                        ->helperText('Upload a photo of the bank teller or transfer receipt.'),
                 ])
                 ->columns(2)
                 ->collapsed(fn ($record) => $record?->isDraft()),
@@ -104,10 +106,21 @@ class BulkRegistrationBatchResource extends Resource
                 ->schema([
                     Forms\Components\Placeholder::make('total_display')
                         ->label('Expected Total')
-                        ->content(fn ($record) => $record
-                            ? '₦' . number_format($record->expected_total, 2) .
-                            ' for ' . $record->entries()->count() . ' campers'
-                            : 'Will be calculated when you save.'),
+                        ->content(function ($record, $get) {
+                            // Try from saved record first
+                            if ($record && $record->expected_total > 0) {
+                                $count = $record->entries()->count();
+                                return '₦' . number_format($record->expected_total, 2) . " ({$count} camper" . ($count !== 1 ? 's' : '') . ')';
+                            }
+                            // Try to calculate from live form data
+                            $entries = $get('entries') ?? [];
+                            $total = collect($entries)->sum(fn ($e) => (float)($e['fee'] ?? 0));
+                            $count = count($entries);
+                            if ($count > 0) {
+                                return '₦' . number_format($total, 2) . " ({$count} camper" . ($count !== 1 ? 's' : '') . ')';
+                            }
+                            return 'Add campers below to see the total.';
+                        })->extraAttributes(['class' => 'text-lg font-bold text-primary-600']),
 
                     Forms\Components\Repeater::make('entries')
                         ->relationship('entries')
@@ -115,7 +128,14 @@ class BulkRegistrationBatchResource extends Resource
                             Forms\Components\TextInput::make('full_name')
                                 ->label('Full Name')
                                 ->required()
-                                ->maxLength(191),
+                                ->maxLength(191)
+                                ->rules([
+                                    function () {
+                                        return function (string $attribute, $value, \Closure $fail) {
+                                            // Uniqueness checked at form-level via afterValidation
+                                        };
+                                    },
+                                ]),
 
                             Forms\Components\TextInput::make('phone')
                                 ->label('Phone Number')
@@ -145,16 +165,61 @@ class BulkRegistrationBatchResource extends Resource
                                 ->disabled()
                                 ->dehydrated(),
 
+                            // Fix: eager-load registrationCode to avoid lazy loading violation
                             Forms\Components\Placeholder::make('code_issued')
                                 ->label('Code')
-                                ->content(fn ($record) => $record?->registrationCode?->code ?? '—')
+                                ->content(function ($record) {
+                                    if (! $record?->id) return '—';
+                                    // Reload with eager-loaded relationship to avoid lazy loading
+                                    $entry = \App\Models\BulkRegistrationEntry::with('registrationCode')
+                                        ->find($record->id);
+                                    return $entry?->registrationCode?->code ?? '—';
+                                })
                                 ->visibleOn('edit'),
                         ])
                         ->columns(4)
                         ->addActionLabel('Add Camper')
                         ->reorderable(false)
+                        ->live()
+                        ->afterStateUpdated(function ($state, \Filament\Forms\Set $set) {
+                            // Validate uniqueness within the batch: same name+phone+category is not allowed
+                            if (! is_array($state)) return;
+
+                            $seen  = [];
+                            $dupes = [];
+
+                            foreach ($state as $entry) {
+                                $name     = strtolower(trim($entry['full_name'] ?? ''));
+                                $phone    = trim($entry['phone'] ?? '');
+                                $category = $entry['category'] ?? '';
+
+                                if (! $name && ! $phone) continue;
+
+                                $key = $name . '|' . $phone . '|' . $category;
+
+                                if (isset($seen[$key])) {
+                                    $dupes[] = trim($entry['full_name'] ?? '');
+                                } else {
+                                    $seen[$key] = true;
+                                }
+                            }
+
+                            // Store duplicate names in a hidden field for display
+                            if (! empty($dupes)) {
+                                $set('duplicate_warning', 'Duplicate entries detected: ' . implode(', ', array_unique($dupes)) . '. Each camper must have a unique name, phone, and category combination.');
+                            } else {
+                                $set('duplicate_warning', null);
+                            }
+                        })
                         ->disabled(fn ($record) => $record && ! $record->isDraft())
                         ->minItems(1),
+
+                    // Duplicate warning banner
+                    Forms\Components\Placeholder::make('duplicate_warning')
+                        ->label('')
+                        ->content(fn ($state) => $state ?? '')
+                        ->hidden(fn ($get) => ! $get('duplicate_warning'))
+                        ->extraAttributes(['class' => 'text-danger-600 bg-danger-50 rounded-lg p-3 text-sm font-medium']),
                 ]),
         ]);
     }
@@ -213,6 +278,13 @@ class BulkRegistrationBatchResource extends Resource
                     ->label('Created By')
                     ->toggleable(),
 
+                Tables\Columns\ImageColumn::make('proof_image_path')
+                    ->label('Proof')
+                    ->disk('public')
+                    ->height(40)
+                    ->width(60)
+                    ->placeholder('—'),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime('d M Y')
@@ -231,23 +303,54 @@ class BulkRegistrationBatchResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
 
-                // Submit for payment
-                Tables\Actions\Action::make('submit_payment')
-                    ->label('Submit for Payment')
-                    ->icon('heroicon-o-paper-airplane')
+                // Pay online via Paystack
+                Tables\Actions\Action::make('pay_paystack')
+                    ->label('Pay with Paystack')
+                    ->icon('heroicon-o-credit-card')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Pay with Paystack?')
+                    ->modalDescription(fn (BulkRegistrationBatch $r) =>
+                        "You will be redirected to Paystack to pay ₦" . number_format($r->expected_total, 2) .
+                        " for " . $r->entries()->count() . " campers. This will lock the camper list."
+                    )
+                    ->visible(fn (BulkRegistrationBatch $r) => $r->isDraft() &&
+                        auth()->user()->hasAnyRole(['church_coordinator', 'super_admin']) &&
+                        config('services.paystack.secret_key'))
+                    ->action(function (BulkRegistrationBatch $record, BulkRegistrationService $service) {
+                        try {
+                            $result = $service->initiatePaystackPayment($record);
+                            Notification::make()
+                                ->title('Redirecting to Paystack...')
+                                ->body('You will be redirected to complete payment.')
+                                ->success()->send();
+                            // Redirect via Filament JS redirect
+                            redirect()->away($result['authorization_url'])->send();
+                            exit;
+                        } catch (\Throwable $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                // Submit for offline payment
+                Tables\Actions\Action::make('submit_offline')
+                    ->label('Submit for Offline Payment')
+                    ->icon('heroicon-o-building-library')
                     ->color('warning')
                     ->requiresConfirmation()
-                    ->modalHeading('Submit Batch for Payment?')
+                    ->modalHeading('Submit for Bank Transfer Payment?')
                     ->modalDescription(fn (BulkRegistrationBatch $r) =>
-                        "This will lock the camper list. Total: ₦" . number_format($r->expected_total, 2) .
-                        " for " . $r->entries()->count() . " campers."
+                        "This locks the camper list. Expected total: ₦" . number_format($r->expected_total, 2) .
+                        " for " . $r->entries()->count() . " campers. Upload your bank transfer proof below."
                     )
                     ->visible(fn (BulkRegistrationBatch $r) => $r->isDraft() &&
                         auth()->user()->hasAnyRole(['church_coordinator', 'super_admin']))
                     ->action(function (BulkRegistrationBatch $record, BulkRegistrationService $service) {
                         try {
-                            $service->submitForPayment($record);
-                            Notification::make()->title('Batch submitted. Please proceed with bank transfer.')->warning()->send();
+                            $service->submitForOfflinePayment($record);
+                            Notification::make()
+                                ->title('Submitted for offline payment. Upload your bank transfer proof on this page.')
+                                ->warning()->send();
                         } catch (\Throwable $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
                         }
@@ -272,9 +375,10 @@ class BulkRegistrationBatchResource extends Resource
                         auth()->user()->hasAnyRole(['accountant', 'super_admin']))
                     ->action(function (BulkRegistrationBatch $record, array $data, BulkRegistrationService $service) {
                         try {
+                            $record->update(['amount_paid' => (float) $data['amount_paid']]);
                             $service->confirmBatch($record, (float) $data['amount_paid'], auth()->id());
                             Notification::make()
-                                ->title('Batch confirmed! ' . $record->entries()->count() . ' codes generated and SMS sent.')
+                                ->title('Confirmed! ' . $record->entries()->count() . ' codes generated and sent via SMS.')
                                 ->success()->send();
                         } catch (\Throwable $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();

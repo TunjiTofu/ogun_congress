@@ -104,6 +104,20 @@ class OfflinePaymentResource extends Resource
                     ->label('Phone')
                     ->searchable(),
 
+                Tables\Columns\TextColumn::make('registration_code_notes')
+                    ->label('District / Church')
+                    ->getStateUsing(function ($record) {
+                        // Try to find the registration code linked to this offline payment
+                        $code = \App\Models\RegistrationCode::where('offline_payment_id', $record->id)
+                            ->with(['camper.church.district'])
+                            ->first();
+                        if ($code?->camper?->church) {
+                            return $code->camper->church->district?->name . ' / ' . $code->camper->church->name;
+                        }
+                        return '—';
+                    })
+                    ->placeholder('—'),
+
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Amount')
                     ->money('NGN')

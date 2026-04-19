@@ -11,13 +11,31 @@ class ContactController extends Controller
 {
     public function store(Request $request, SmsService $smsService)
     {
-        $validated = $request->validate([
+        $rules = [
             'sender_name'  => ['required', 'string', 'max:191'],
             'sender_phone' => ['required', 'string', 'max:20'],
             'sender_email' => ['nullable', 'email', 'max:191'],
             'category'     => ['required', 'in:general,complaint,inquiry,payment'],
             'message'      => ['required', 'string', 'max:2000'],
-        ]);
+        ];
+
+        // Validate reCAPTCHA if configured
+        if (config('services.recaptcha.secret_key')) {
+            $token = $request->input('g-recaptcha-response');
+            if (! $token) {
+                return back()->withInput()->withErrors(['recaptcha' => 'Please complete the reCAPTCHA verification.']);
+            }
+            $response = \Illuminate\Support\Facades\Http::post('https://www.google.com/recaptcha/api/siteverify', [
+                'secret'   => config('services.recaptcha.secret_key'),
+                'response' => $token,
+                'remoteip' => $request->ip(),
+            ]);
+            if (! ($response->json('success') ?? false)) {
+                return back()->withInput()->withErrors(['recaptcha' => 'reCAPTCHA verification failed. Please try again.']);
+            }
+        }
+
+        $validated = $request->validate($rules);
 
         $msg = ContactMessage::create($validated);
 

@@ -798,6 +798,11 @@
                                   onblur="this.style.borderColor='#E5E7EB'">{{ old('message') }}</textarea>
                         @error('message')<p style="color:#DC2626;font-size:0.72rem;margin-top:0.2rem;">{{ $message }}</p>@enderror
                     </div>
+                    @if(config('services.recaptcha.site_key'))
+                        <div class="g-recaptcha"
+                             data-sitekey="{{ config('services.recaptcha.site_key') }}"
+                             style="margin-bottom:0.75rem;"></div>
+                    @endif
                     <button type="submit" class="btn-primary" style="align-self:flex-start;border:none;cursor:pointer;">
                         Send Message &rarr;
                     </button>
@@ -872,7 +877,6 @@
     (function() {
         const target = new Date('{{ setting('camp_start_date') }}T00:00:00');
         function pad(n) { return String(n).padStart(2,'0'); }
-        function tick() {
         function tick() {
             const diff = target - new Date();
             if (diff <= 0) {

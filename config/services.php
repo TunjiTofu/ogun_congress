@@ -39,7 +39,7 @@ return [
 
     // ── Termii ────────────────────────────────────────────────────────────────
     'termii' => [
-        'base_url' => env('TERMII_BASE_URL', 'https://api.ng.termii.com/api'),
+        'base_url' => env('TERMII_BASE_URL', 'https://v3.api.termii.com'),
     ],
 
     // ── Africa's Talking ──────────────────────────────────────────────────────
@@ -48,4 +48,8 @@ return [
         'api_key'  => env('AT_API_KEY'),
     ],
 
+    'recaptcha' => [
+        'site_key'   => env('RECAPTCHA_SITE_KEY'),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+    ],
 ];
