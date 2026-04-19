@@ -3,6 +3,7 @@
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\RegistrationController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 
 // ── Landing page ───────────────────────────────────────────────────────────────
 Route::get('/', fn () => view('welcome'))->name('home');
@@ -51,7 +52,7 @@ Route::prefix('portal')->name('portal.')->group(function () {
 Route::get('/documents/download/{path}', function (string $path) {
     $filePath = base64_decode($path);
 
-    if (! \Illuminate\Support\Facades\Storage::disk('private')->exists($filePath)) {
+    if (! Storage::disk('private')->exists($filePath)) {
         abort(404, 'Document not found.');
     }
 

@@ -548,7 +548,7 @@
             <p>Enter it below to begin filling in your registration form.</p>
             <form class="code-form" action="{{ route('registration.index') }}" method="GET">
                 <input type="text" name="code" class="code-input"
-                       placeholder="OGN-2026-XXXXXX" maxlength="14"
+                       placeholder="OGN-2026-XXXXXX" maxlength="15"
                        oninput="this.value=this.value.toUpperCase()"/>
                 <button type="submit" class="btn-primary" style="white-space:nowrap">Continue &rarr;</button>
             </form>

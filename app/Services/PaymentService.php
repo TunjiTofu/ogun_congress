@@ -128,9 +128,8 @@ class PaymentService
      */
     public function verifyPaystackWebhookSignature(string $payload, string $signature): bool
     {
-        $secret   = config('services.paystack.webhook_secret');
+        $secret = config('services.paystack.secret_key'); // <-- change this
         $expected = hash_hmac('sha512', $payload, $secret);
-
         return hash_equals($expected, $signature);
     }
 
