@@ -19,6 +19,7 @@ class OfflinePayment extends Model
     protected $fillable = [
         'submitted_name',
         'submitted_phone',
+        'category',
         'amount',
         'bank_name',
         'deposit_date',
@@ -33,6 +34,7 @@ class OfflinePayment extends Model
     protected function casts(): array
     {
         return [
+            'category'     => \App\Enums\CamperCategory::class,
             'status'       => OfflinePaymentStatus::class,
             'amount'       => 'decimal:2',
             'deposit_date' => 'date',

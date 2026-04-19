@@ -78,10 +78,17 @@
                 if (this.availableRanks.length > 0 && !this.selectedClubRank) {
                     this.validationError = 'Please select a club rank.'; return false;
                 }
-                if (this.category === 'senior_youth') {
-                    if (!document.querySelector('select[name="club_rank"]')?.value) {
-                        this.validationError = 'Please select the Senior Youth group.'; return false;
-                    }
+                // if (this.category === 'senior_youth') {
+                //     if (!document.querySelector('select[name="club_rank"]')?.value) {
+                //         this.validationError = 'Please select the Senior Youth group.'; return false;
+                //     }
+                // }
+                if (!this.selectedClubRank) {
+                    this.validationError =
+                        this.category === 'senior_youth'
+                            ? 'Please select the Senior Youth group.'
+                            : 'Please select a club rank.';
+                    return false;
                 }
                 return true;
             },
@@ -286,11 +293,17 @@
                     {{-- Senior Youth group --}}
                     <div x-show="category === 'senior_youth'">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Senior Youth Group <span class="text-red-500">*</span></label>
-                        <select name="club_rank"
+{{--                        <select name="club_rank"--}}
+{{--                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none">--}}
+{{--                            <option value="">— Select —</option>--}}
+{{--                            <option value="Ambassador" {{ old('club_rank')==='Ambassador' ? 'selected' : '' }}>Ambassador (Ages 16–21)</option>--}}
+{{--                            <option value="Young Adults" {{ old('club_rank')==='Young Adults' ? 'selected' : '' }}>Young Adults (Ages 22+)</option>--}}
+{{--                        </select>--}}
+                        <select name="club_rank" x-model="selectedClubRank"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none">
                             <option value="">— Select —</option>
-                            <option value="Ambassador" {{ old('club_rank')==='Ambassador' ? 'selected' : '' }}>Ambassador (Ages 16–21)</option>
-                            <option value="Young Adults" {{ old('club_rank')==='Young Adults' ? 'selected' : '' }}>Young Adults (Ages 22+)</option>
+                            <option value="Ambassador">Ambassador (Ages 16–21)</option>
+                            <option value="Young Adults">Young Adults (Ages 22+)</option>
                         </select>
                     </div>
                 </div>

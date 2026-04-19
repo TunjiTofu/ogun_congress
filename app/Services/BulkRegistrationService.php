@@ -66,8 +66,14 @@ class BulkRegistrationService
         $amountKobo = (int)($batch->expected_total * 100);
         $reference  = 'BATCH-' . $batch->id . '-' . now()->timestamp;
 
-        $callbackUrl = route('batch.payment.callback', ['batch' => $batch->id])
-            . '?reference=' . $reference;
+        // Build callback URL — use url() as fallback if route() fails in certain contexts
+        try {
+            $callbackUrl = route('batch.payment.callback', ['batch' => $batch->id])
+                . '?reference=' . $reference;
+        } catch (\Throwable) {
+            $callbackUrl = url('/batch-payment/callback/' . $batch->id)
+                . '?reference=' . $reference;
+        }
 
         $response = Http::withToken(config('services.paystack.secret_key'))
             ->acceptJson()

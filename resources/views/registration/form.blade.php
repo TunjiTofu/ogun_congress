@@ -85,9 +85,12 @@
                 if (this.availableRanks.length > 0 && !this.selectedClubRank) {
                     this.validationError = 'Please select your club rank / class.'; return false;
                 }
-                if (this.category === 'senior_youth') {
-                    const srGroup = document.querySelector('select[name="club_rank"]')?.value;
-                    if (!srGroup) { this.validationError = 'Please select your Senior Youth group.'; return false; }
+                if (!this.selectedClubRank) {
+                    this.validationError =
+                        this.category === 'senior_youth'
+                            ? 'Please select the Senior Youth group.'
+                            : 'Please select a club rank.';
+                    return false;
                 }
                 return true;
             },
@@ -322,16 +325,11 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Senior Youth Group <span class="text-red-500">*</span>
                         </label>
-                        <select name="club_rank"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
-                                   focus:outline-none focus:ring-2 focus:ring-navy">
+                        <select name="club_rank" x-model="selectedClubRank"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none">
                             <option value="">— Select —</option>
-                            <option value="Ambassador" {{ old('club_rank')==='Ambassador' ? 'selected' : '' }}>
-                                Ambassador (Ages 16–21)
-                            </option>
-                            <option value="Young Adults" {{ old('club_rank')==='Young Adults' ? 'selected' : '' }}>
-                                Young Adults (Ages 22+)
-                            </option>
+                            <option value="Ambassador">Ambassador (Ages 16–21)</option>
+                            <option value="Young Adults">Young Adults (Ages 22+)</option>
                         </select>
                         <p class="text-xs text-gray-400 mt-1">Ambassador (16–21 years) &bull; Young Adults (22 years and above)</p>
                     </div>

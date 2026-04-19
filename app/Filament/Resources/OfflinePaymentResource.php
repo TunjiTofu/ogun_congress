@@ -55,6 +55,14 @@ class OfflinePaymentResource extends Resource
                         ->tel()
                         ->maxLength(20),
 
+                    Forms\Components\Select::make('category')
+                        ->label('Department')
+                        ->options(collect(\App\Enums\CamperCategory::cases())
+                            ->mapWithKeys(fn ($e) => [$e->value => $e->label()])
+                            ->toArray())
+                        ->required()
+                        ->helperText('Adventurer (6–9) · Pathfinder (10–15) · Senior Youth (16+)'),
+
                     Forms\Components\TextInput::make('amount')
                         ->label('Amount (₦)')
                         ->required()
@@ -103,6 +111,17 @@ class OfflinePaymentResource extends Resource
                 Tables\Columns\TextColumn::make('submitted_phone')
                     ->label('Phone')
                     ->searchable(),
+
+                Tables\Columns\BadgeColumn::make('category')
+                    ->label('Department')
+                    ->placeholder('—')
+                    ->colors([
+                        'info'    => 'adventurer',
+                        'success' => 'pathfinder',
+                        'warning' => 'senior_youth',
+                    ])
+                    ->formatStateUsing(fn ($state) => $state instanceof \App\Enums\CamperCategory
+                        ? $state->label() : ($state ?? '—')),
 
                 Tables\Columns\TextColumn::make('registration_code_notes')
                     ->label('District / Church')

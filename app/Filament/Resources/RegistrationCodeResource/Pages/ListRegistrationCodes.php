@@ -22,17 +22,17 @@ class ListRegistrationCodes extends ListRecords
         return [
             'all'     => Tab::make('All'),
             'active'  => Tab::make('Active')
-                ->modifyQueryUsing(fn ($q) => $q->where('status', CodeStatus::ACTIVE))
+                ->modifyQueryUsing(fn ($query) => $query->where('status', CodeStatus::ACTIVE))
                 ->badge(fn () => \App\Models\RegistrationCode::where('status', CodeStatus::ACTIVE)->count())
                 ->badgeColor('success'),
             'pending' => Tab::make('Pending Payment')
-                ->modifyQueryUsing(fn ($q) => $q->where('status', CodeStatus::PENDING))
+                ->modifyQueryUsing(fn ($query) => $query->where('status', CodeStatus::PENDING))
                 ->badge(fn () => \App\Models\RegistrationCode::where('status', CodeStatus::PENDING)->count())
                 ->badgeColor('warning'),
             'claimed' => Tab::make('Claimed')
-                ->modifyQueryUsing(fn ($q) => $q->where('status', CodeStatus::CLAIMED)),
+                ->modifyQueryUsing(fn ($query) => $query->where('status', CodeStatus::CLAIMED)),
             'expired' => Tab::make('Expired')
-                ->modifyQueryUsing(fn ($q) => $q->where('status', CodeStatus::EXPIRED)),
+                ->modifyQueryUsing(fn ($query) => $query->where('status', CodeStatus::EXPIRED)),
         ];
     }
 }

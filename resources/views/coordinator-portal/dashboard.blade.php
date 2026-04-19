@@ -96,6 +96,7 @@
     </div>
     <form method="POST" action="{{ route('coordinator.portal.logout') }}" style="display:inline">
         @csrf
+        @method('POST')
         <button type="submit" class="btn-logout">Log Out</button>
     </form>
 </nav>

@@ -178,6 +178,7 @@ class CoordinatorPortalController extends Controller
                 'camper_number'        => $registrationCode->code,
                 'full_name'            => $entry->full_name,
                 'phone'                => $entry->phone,
+                'date_of_birth'        => null, // not collected by coordinator — DOB is optional
                 'gender'               => $validated['gender'],
                 'category'             => $category,
                 'home_address'         => $validated['home_address'] ?? null,

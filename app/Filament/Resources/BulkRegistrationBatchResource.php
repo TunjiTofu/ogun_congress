@@ -362,20 +362,32 @@ class BulkRegistrationBatchResource extends Resource
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->form([
+                        Forms\Components\Placeholder::make('expected_total_display')
+                            ->label('Expected Total')
+                            ->content(fn (BulkRegistrationBatch $r) =>
+                                '₦' . number_format($r->entries()->sum('fee'), 2) .
+                                ' for ' . $r->entries()->count() . ' camper(s)'
+                            ),
                         Forms\Components\TextInput::make('amount_paid')
                             ->label('Amount Received (₦)')
                             ->numeric()
                             ->prefix('₦')
                             ->required()
+                            ->minValue(1)
                             ->helperText(fn (BulkRegistrationBatch $r) =>
-                                "Expected: ₦" . number_format($r->expected_total, 2)
+                                "Must be ₦" . number_format($r->entries()->sum('fee'), 2) . " (within ₦1 tolerance)"
+                            )
+                            ->default(fn (BulkRegistrationBatch $r) =>
+                            (string) $r->entries()->sum('fee')
                             ),
                     ])
                     ->visible(fn (BulkRegistrationBatch $r) => $r->isPendingPayment() &&
                         auth()->user()->hasAnyRole(['accountant', 'super_admin']))
                     ->action(function (BulkRegistrationBatch $record, array $data, BulkRegistrationService $service) {
                         try {
-                            $record->update(['amount_paid' => (float) $data['amount_paid']]);
+                            // Refresh expected total from actual entries before confirming
+                            $record->recalculateTotal();
+                            $record->refresh();
                             $service->confirmBatch($record, (float) $data['amount_paid'], auth()->id());
                             Notification::make()
                                 ->title('Confirmed! ' . $record->entries()->count() . ' codes generated and sent via SMS.')

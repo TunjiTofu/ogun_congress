@@ -26,15 +26,15 @@ class ListOfflinePayments extends ListRecords
             'all' => Tab::make('All'),
 
             'pending' => Tab::make('Pending')
-                ->modifyQueryUsing(fn ($q) => $q->where('status', OfflinePaymentStatus::PENDING))
+                ->modifyQueryUsing(fn ($query) => $query->where('status', OfflinePaymentStatus::PENDING))
                 ->badge(fn () => \App\Models\OfflinePayment::where('status', OfflinePaymentStatus::PENDING)->count())
                 ->badgeColor('warning'),
 
             'confirmed' => Tab::make('Confirmed')
-                ->modifyQueryUsing(fn ($q) => $q->where('status', OfflinePaymentStatus::CONFIRMED)),
+                ->modifyQueryUsing(fn ($query) => $query->where('status', OfflinePaymentStatus::CONFIRMED)),
 
             'rejected' => Tab::make('Rejected')
-                ->modifyQueryUsing(fn ($q) => $q->where('status', OfflinePaymentStatus::REJECTED)),
+                ->modifyQueryUsing(fn ($query) => $query->where('status', OfflinePaymentStatus::REJECTED)),
         ];
     }
 }

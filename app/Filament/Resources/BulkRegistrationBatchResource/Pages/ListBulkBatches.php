@@ -24,12 +24,12 @@ class ListBulkBatches extends ListRecords
     {
         return [
             'all'             => Tab::make('All'),
-            'draft'           => Tab::make('Draft')->modifyQueryUsing(fn ($q) => $q->where('status', 'draft')),
+            'draft'           => Tab::make('Draft')->modifyQueryUsing(fn ($query) => $query->where('status', 'draft')),
             'pending_payment' => Tab::make('Pending Payment')
-                ->modifyQueryUsing(fn ($q) => $q->where('status', 'pending_payment'))
+                ->modifyQueryUsing(fn ($query) => $query->where('status', 'pending_payment'))
                 ->badge(fn () => \App\Models\BulkRegistrationBatch::where('status', 'pending_payment')->count())
                 ->badgeColor('warning'),
-            'confirmed'       => Tab::make('Confirmed')->modifyQueryUsing(fn ($q) => $q->where('status', 'confirmed')),
+            'confirmed'       => Tab::make('Confirmed')->modifyQueryUsing(fn ($query) => $query->where('status', 'confirmed')),
         ];
     }
 }

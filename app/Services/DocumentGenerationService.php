@@ -12,7 +12,8 @@ class DocumentGenerationService
 {
     public function generateIdCard(Camper $camper): string
     {
-        $qrCode      = $this->generateQrCodeSvg($camper->camper_number);
+        $qrCodeUrl   = $this->generateQrCodeSvg($camper->camper_number);
+        $qrCode      = $qrCodeUrl; // base64 PNG data URL
         $photoBase64 = $this->encodePhotoBase64($camper);
         $badgeColor  = $camper->badge_color
             ?? config("camp.badge_colors.{$camper->category->value}", '#1B3A6B');
@@ -24,7 +25,7 @@ class DocumentGenerationService
             'badgeColor'  => $badgeColor,
             'campName'    => setting('camp_name', 'Ogun Youth Camp'),
             'campYear'    => now()->year,
-        ])->setPaper([0, 0, 242.65, 153.01]);
+        ])->setPaper([0, 0, 242.65, 153.01], 'landscape');
 
         $path = 'id-cards/' . $camper->camper_number . '.pdf';
         Storage::disk('private')->put($path, $pdf->output());
@@ -59,9 +60,19 @@ class DocumentGenerationService
         return route('documents.download', ['path' => base64_encode($path)]);
     }
 
+    /**
+     * Generate QR code as base64 PNG.
+     * DomPDF renders PNG reliably; SVG support is inconsistent.
+     */
     private function generateQrCodeSvg(string $camperNumber): string
     {
-        return (string) QrCode::format('svg')->size(150)->errorCorrection('M')->generate("OGN:{$camperNumber}");
+        $png = QrCode::format('png')
+            ->size(150)
+            ->margin(1)
+            ->errorCorrection('M')
+            ->generate("OGN:{$camperNumber}");
+
+        return 'data:image/png;base64,' . base64_encode($png);
     }
 
     private function encodePhotoBase64(Camper $camper): string

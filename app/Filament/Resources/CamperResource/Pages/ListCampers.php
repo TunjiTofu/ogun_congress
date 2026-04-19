@@ -23,15 +23,15 @@ class ListCampers extends ListRecords
             'all' => Tab::make('All'),
 
             'adventurers' => Tab::make('Adventurers')
-                ->modifyQueryUsing(fn ($q) => $q->where('category', CamperCategory::ADVENTURER))
+                ->modifyQueryUsing(fn ($query) => $query->where('category', CamperCategory::ADVENTURER))
                 ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::ADVENTURER)->count()),
 
             'pathfinders' => Tab::make('Pathfinders')
-                ->modifyQueryUsing(fn ($q) => $q->where('category', CamperCategory::PATHFINDER))
+                ->modifyQueryUsing(fn ($query) => $query->where('category', CamperCategory::PATHFINDER))
                 ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::PATHFINDER)->count()),
 
             'senior_youth' => Tab::make('Senior Youth')
-                ->modifyQueryUsing(fn ($q) => $q->where('category', CamperCategory::SENIOR_YOUTH))
+                ->modifyQueryUsing(fn ($query) => $query->where('category', CamperCategory::SENIOR_YOUTH))
                 ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::SENIOR_YOUTH)->count()),
         ];
     }

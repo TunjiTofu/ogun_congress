@@ -122,13 +122,21 @@ class Camper extends Model implements HasMedia
 
     // ── Computed / Helpers ────────────────────────────────────────────────────
 
-    public function getAgeAttribute(): int
+    public function getAgeAttribute(): ?int
     {
+        if (! $this->date_of_birth) return null;
         return Carbon::parse($this->date_of_birth)->age;
     }
 
     public function requiresConsentForm(): bool
     {
+        // If DOB is unknown, use category — Adventurers and Pathfinders are always under 18
+        if (! $this->date_of_birth) {
+            return in_array($this->category, [
+                \App\Enums\CamperCategory::ADVENTURER,
+                \App\Enums\CamperCategory::PATHFINDER,
+            ]);
+        }
         return $this->age < 18;
     }
 

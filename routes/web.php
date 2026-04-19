@@ -3,20 +3,39 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
+use App\Models\Church;
+
 use App\Http\Controllers\{
     PaymentController,
     RegistrationController,
     ContactController,
     CamperPortalController,
-    CoordinatorPortalController
+    CoordinatorPortalController,
+    BatchPaymentController
 };
-use App\Models\Church;
 
 /*
 |--------------------------------------------------------------------------
 | Web Routes
 |--------------------------------------------------------------------------
 */
+
+// ── Storage (Safer version) ─────────────────────────────────────────────
+Route::get('/storage/{path}', function (string $path) {
+
+    abort_if(str_contains($path, '..'), 403); // prevent traversal
+
+    $fullPath = storage_path('app/public/' . $path);
+
+    abort_unless(file_exists($fullPath), 404);
+
+    return response()->file($fullPath, [
+        'Content-Type'  => mime_content_type($fullPath) ?: 'application/octet-stream',
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+
+})->where('path', '.*')->name('storage.serve');
+
 
 // ── Landing ─────────────────────────────────────────────────────────────
 Route::view('/', 'welcome')->name('home');
@@ -36,13 +55,12 @@ Route::prefix('registration')->name('registration.')->group(function () {
         Route::get('/success/{code}', 'success')->name('success');
     });
 
-    Route::controller(PaymentController::class)->group(function () {
-        Route::post('/pay-online', 'initiateWeb')->name('payment.initiate-web');
-    });
+    Route::post('/pay-online', [PaymentController::class, 'initiateWeb'])
+        ->name('payment.initiate-web');
 });
 
 
-// ── API (lightweight) ───────────────────────────────────────────────────
+// ── API ─────────────────────────────────────────────────────────────────
 Route::prefix('api')->group(function () {
     Route::get('/churches', function () {
         return Church::query()
@@ -67,7 +85,18 @@ Route::prefix('coordinator-portal')
         Route::get('/', 'index')->name('index');
         Route::post('/login', 'login')->name('login');
         Route::get('/dashboard', 'dashboard')->name('dashboard');
+
         Route::post('/logout', 'logout')->name('logout');
+
+        // Optional GET logout fallback
+        Route::get('/logout', function () {
+            auth()->logout();
+            session()->forget('coordinator_logged_in');
+
+            return redirect()
+                ->route('coordinator.portal.index')
+                ->with('success', 'Logged out.');
+        });
 
         Route::get('/batch/{batch}/camper/{entry}', 'form')->name('form');
         Route::post('/batch/{batch}/camper/{entry}', 'submitForm')->name('submit');
@@ -87,8 +116,14 @@ Route::prefix('portal')
     });
 
 
-// ── Documents ───────────────────────────────────────────────────────────
+// ── Batch Payment Callback ──────────────────────────────────────────────
+Route::get('/batch-payment/callback/{batch}', [BatchPaymentController::class, 'callback'])
+    ->name('batch.payment.callback');
+
+
+// ── Documents (still needs improvement) ─────────────────────────────────
 Route::get('/documents/download/{path}', function (string $path) {
+
     $filePath = base64_decode($path);
 
     abort_unless(
@@ -104,10 +139,11 @@ Route::get('/documents/download/{path}', function (string $path) {
             'Content-Disposition' => 'inline; filename="' . basename($filePath) . '"',
         ]
     );
+
 })->name('documents.download');
 
 
-// ── PWA Check-in ────────────────────────────────────────────────────────
+// ── PWA ─────────────────────────────────────────────────────────────────
 Route::view('/checkin/{any?}', 'pwa.checkin')
     ->where('any', '.*')
     ->name('checkin.app');

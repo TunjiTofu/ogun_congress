@@ -64,11 +64,11 @@ class BulkRegistrationBatch extends Model
 
     /**
      * Recalculate the expected total from entry fees.
+     * Uses a fresh DB query to avoid stale relationship cache.
      */
     public function recalculateTotal(): void
     {
-        $this->update([
-            'expected_total' => $this->entries()->sum('fee'),
-        ]);
+        $total = \App\Models\BulkRegistrationEntry::where('batch_id', $this->id)->sum('fee');
+        $this->updateQuietly(['expected_total' => $total]);
     }
 }

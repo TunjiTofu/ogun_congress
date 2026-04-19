@@ -115,7 +115,7 @@ class RegistrationService
                 'camper_number'        => $registrationCode->code,
                 'full_name'            => $registrationCode->prefill_name,
                 'phone'                => $registrationCode->prefill_phone,
-                'date_of_birth'        => $data['date_of_birth'] ?? null,
+                'date_of_birth'        => isset($data['date_of_birth']) && $data['date_of_birth'] !== '' ? $data['date_of_birth'] : null,
                 'gender'               => $data['gender'],
                 'category'             => $category,
                 'home_address'         => $data['home_address'] ?? null,

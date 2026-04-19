@@ -146,6 +146,15 @@ class CamperResource extends Resource
                     ->searchable()
                     ->toggleable(),
 
+                Tables\Columns\TextColumn::make('registration_source')
+                    ->label('Source')
+                    ->getStateUsing(fn (Camper $r) => $r->registrationCode?->bulk_batch_id
+                        ? 'Batch #' . $r->registrationCode->bulk_batch_id
+                        : 'Individual')
+                    ->badge()
+                    ->color(fn (string $state) => str_starts_with($state, 'Batch') ? 'info' : 'gray')
+                    ->toggleable(),
+
                 Tables\Columns\BadgeColumn::make('registrationCode.payment_type')
                     ->label('Payment')
                     ->colors([

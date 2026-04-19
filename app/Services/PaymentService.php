@@ -128,8 +128,9 @@ class PaymentService
      */
     public function verifyPaystackWebhookSignature(string $payload, string $signature): bool
     {
-        $secret = config('services.paystack.secret_key'); // <-- change this
+        $secret   = config('services.paystack.webhook_secret');
         $expected = hash_hmac('sha512', $payload, $secret);
+
         return hash_equals($expected, $signature);
     }
 
@@ -166,6 +167,7 @@ class PaymentService
                 'status'             => CodeStatus::ACTIVE,
                 'prefill_name'       => $confirmedPayment->submitted_name,
                 'prefill_phone'      => $confirmedPayment->submitted_phone,
+                'prefill_category'   => $confirmedPayment->category?->value,
                 'amount_paid'        => $confirmedPayment->amount,
                 'offline_payment_id' => $confirmedPayment->id,
                 'created_by'         => $confirmedByUserId,
