@@ -23,13 +23,13 @@ class SubmitRegistrationRequest extends FormRequest
             'code'                  => ['required', 'string', 'exists:registration_codes,code'],
 
             // Step 1 — Personal
-//            'date_of_birth'         => ['required', 'date', 'before:today', 'after:' . now()->subYears(100)->toDateString()],
+            'date_of_birth'         => ['nullable', 'date', 'before:today', 'after:' . now()->subYears(100)->toDateString()],
             'gender'                => ['required', new Enum(Gender::class)],
             'home_address'          => ['nullable', 'string', 'max:500'],
-            'photo'                 => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'photo'                 => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
 
             // Step 2 — Church & Ministry
-            'church_id'             => ['required', 'integer', 'exists:churches,id'],
+            'church_id'             => ['nullable', 'integer', 'exists:churches,id'],
             'ministry'              => ['nullable', 'string', 'max:100'],
             'club_rank'             => ['nullable', 'string', 'max:100'],
             'volunteer_role'        => ['nullable', 'string', 'max:100'],
@@ -58,7 +58,7 @@ class SubmitRegistrationRequest extends FormRequest
     public function messages(): array
     {
         return [
-//            'date_of_birth.before'        => 'Date of birth must be in the past.',
+            'date_of_birth.before'        => 'Date of birth must be in the past.',
             'church_id.exists'            => 'Please select a valid church.',
             'photo.mimes'                 => 'Photo must be a JPEG or PNG image.',
             'photo.max'                   => 'Photo must be smaller than 2MB.',

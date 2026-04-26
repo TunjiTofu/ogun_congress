@@ -169,7 +169,18 @@ class RegistrationController extends Controller
      */
     public function submitWeb(\App\Http\Requests\SubmitRegistrationRequest $request)
     {
-        $camper = $this->registrationService->submit($request->validated());
+        $data = $request->validated();
+
+        // Always pull the photo from $request->file() to guarantee we get
+        // the UploadedFile object — $request->validated() can return the
+        // tmp path string which disappears before addMedia() runs.
+        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+            $data['photo'] = $request->file('photo');
+        } else {
+            unset($data['photo']);
+        }
+
+        $camper = $this->registrationService->submit($data);
 
         return redirect()->route('registration.success', ['code' => $camper->camper_number]);
     }

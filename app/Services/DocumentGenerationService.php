@@ -12,7 +12,7 @@ class DocumentGenerationService
 {
     public function generateIdCard(Camper $camper): string
     {
-        $qrCodeUrl   = $this->generateQrCodeSvg($camper->camper_number);
+        $qrCodeUrl   = $this->generateQrCodeSvg($camper->camper_number, $camper->id);
         $qrCode      = $qrCodeUrl; // base64 PNG data URL
         $photoBase64 = $this->encodePhotoBase64($camper);
         $badgeColor  = $camper->badge_color
@@ -61,16 +61,31 @@ class DocumentGenerationService
     }
 
     /**
-     * Generate QR code as base64 PNG.
-     * DomPDF renders PNG reliably; SVG support is inconsistent.
+     * Generate QR code PNG, store it on the private disk, update camper record,
+     * and return a base64 data URL for embedding in the PDF.
+     *
+     * The QR encodes the public verification URL so scanning with any phone
+     * shows the camper's details page at /verify/{camper_number}.
      */
-    private function generateQrCodeSvg(string $camperNumber): string
+    private function generateQrCodeSvg(string $camperNumber, ?int $camperId = null): string
     {
+        $verifyUrl = url('/verify/' . $camperNumber);
+
         $png = QrCode::format('png')
-            ->size(150)
+            ->size(300)
             ->margin(1)
             ->errorCorrection('M')
-            ->generate("OGN:{$camperNumber}");
+            ->generate($verifyUrl);
+
+        // Store the QR code file
+        $qrPath = 'qr-codes/' . $camperNumber . '.png';
+        Storage::disk('public')->put($qrPath, $png);
+
+        // Update the camper record if ID provided
+        if ($camperId) {
+            \App\Models\Camper::where('id', $camperId)
+                ->update(['qr_code_path' => $qrPath]);
+        }
 
         return 'data:image/png;base64,' . base64_encode($png);
     }

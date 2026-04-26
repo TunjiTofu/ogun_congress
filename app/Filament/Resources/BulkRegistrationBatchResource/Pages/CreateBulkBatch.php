@@ -33,13 +33,14 @@ class CreateBulkBatch extends CreateRecord
         $data['created_by'] = $user->id;
         $data['status']     = 'draft';
 
-        // Auto-set church from coordinator if not set
-        if ($user->hasRole('church_coordinator') && $user->church_id && empty($data['church_id'])) {
+        // Coordinators always get their church — no conditional
+        if ($user->hasRole('church_coordinator')) {
             $data['church_id'] = $user->church_id;
         }
 
-        // Strip UI-only and relationship fields
-        unset($data['district_id'], $data['district_id_for_church'], $data['entries']);
+        // Strip all UI-only and relationship fields
+        unset($data['district_id'], $data['district_id_for_church'], $data['entries'],
+            $data['church_display'], $data['district_display'], $data['duplicate_warning']);
         return $data;
     }
 

@@ -183,21 +183,26 @@ class BulkRegistrationService
                 'confirmed_at' => now(),
             ]);
 
+            // Resolve church_id — fallback to the creator's church if batch.church_id is null
+            $churchId = $batch->church_id
+                ?? \App\Models\User::find($batch->created_by)?->church_id;
+
             foreach ($batch->entries()->get() as $entry) {
                 $code = $this->codeGenerationService->generate();
 
                 $registrationCode = RegistrationCode::create([
-                    'code'             => $code,
-                    'payment_type'     => $batch->isOnlinePayment() ? PaymentType::ONLINE : PaymentType::OFFLINE,
-                    'status'           => CodeStatus::ACTIVE,
-                    'prefill_name'     => $entry->full_name,
-                    'prefill_phone'    => $entry->phone,
-                    'prefill_category' => $entry->category->value,
-                    'amount_paid'      => $entry->fee,
-                    'bulk_batch_id'    => $batch->id,
-                    'created_by'       => $confirmedByUserId,
-                    'activated_at'     => now(),
-                    'expires_at'       => now()->addDays((int) config('camp.code_expiry_days', 14)),
+                    'code'              => $code,
+                    'payment_type'      => $batch->isOnlinePayment() ? PaymentType::ONLINE : PaymentType::OFFLINE,
+                    'status'            => CodeStatus::ACTIVE,
+                    'prefill_name'      => $entry->full_name,
+                    'prefill_phone'     => $entry->phone,
+                    'prefill_category'  => $entry->category->value,
+                    'prefill_church_id' => $churchId,
+                    'amount_paid'       => $entry->fee,
+                    'bulk_batch_id'     => $batch->id,
+                    'created_by'        => $confirmedByUserId,
+                    'activated_at'      => now(),
+                    'expires_at'        => now()->addDays((int) config('camp.code_expiry_days', 14)),
                 ]);
 
                 $entry->update([

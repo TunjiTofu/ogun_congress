@@ -56,6 +56,7 @@ class RegistrationService
             'prefill_name'      => $registrationCode->prefill_name,
             'prefill_phone'     => $registrationCode->prefill_phone,
             'prefill_category'  => $registrationCode->prefill_category,
+            'prefill_church_id' => $registrationCode->prefill_church_id,
             'amount_paid'       => $registrationCode->amount_paid,
             'payment_type'      => $registrationCode->payment_type->label(),
         ];
@@ -119,7 +120,7 @@ class RegistrationService
                 'gender'               => $data['gender'],
                 'category'             => $category,
                 'home_address'         => $data['home_address'] ?? null,
-                'church_id'            => $data['church_id'],
+                'church_id'            => $registrationCode->prefill_church_id ?? $data['church_id'],
                 'ministry'             => $data['ministry'] ?? null,
                 'club_rank'            => $data['club_rank'] ?? null,
             ]);

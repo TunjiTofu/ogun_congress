@@ -29,6 +29,7 @@
             labels: ['Personal & Church Details','Parent / Guardian','Health Information','Review & Submit'],
             validationError: '',
             category: prefillCategory,
+            lockedChurchId: '{{ $prefill["prefill_church_id"] ?? "" }}',
             districtId: '{{ old("district_id","") }}',
             churches: [],
             selectedClubRank: '{{ old("club_rank","") }}',
@@ -76,21 +77,21 @@
                 if (!document.getElementById('photo-input')?.files.length) {
                     this.validationError = 'Please upload a passport photo.'; return false;
                 }
-                if (!this.districtId) {
-                    this.validationError = 'Please select your district.'; return false;
-                }
-                if (!document.querySelector('select[name="church_id"]')?.value) {
-                    this.validationError = 'Please select your church.'; return false;
+                // Only validate district/church if church is not locked by the code
+                if (!this.lockedChurchId) {
+                    if (!this.districtId) {
+                        this.validationError = 'Please select your district.'; return false;
+                    }
+                    if (!document.querySelector('select[name="church_id"]')?.value) {
+                        this.validationError = 'Please select your church.'; return false;
+                    }
                 }
                 if (this.availableRanks.length > 0 && !this.selectedClubRank) {
                     this.validationError = 'Please select your club rank / class.'; return false;
                 }
-                if (!this.selectedClubRank) {
-                    this.validationError =
-                        this.category === 'senior_youth'
-                            ? 'Please select the Senior Youth group.'
-                            : 'Please select a club rank.';
-                    return false;
+                if (this.category === 'senior_youth') {
+                    const srGroup = document.querySelector('select[name="club_rank"]')?.value;
+                    if (!srGroup) { this.validationError = 'Please select your Senior Youth group.'; return false; }
                 }
                 return true;
             },
@@ -264,34 +265,60 @@
                 <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
                     <h2 class="font-bold text-navy text-base">Church &amp; Ministry</h2>
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">District <span class="text-red-500">*</span></label>
-                        <select x-model="districtId" @change="loadChurches()"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
-                                   focus:outline-none focus:ring-2 focus:ring-navy">
-                            <option value="">— Select District —</option>
-                            @foreach($districts as $district)
-                                <option value="{{ $district->id }}" {{ old('district_id')==$district->id ? 'selected' : '' }}>
-                                    {{ $district->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    @php
+                        $lockedChurch = !empty($prefill['prefill_church_id'])
+                            ? \App\Models\Church::with('district')->find($prefill['prefill_church_id'])
+                            : null;
+                    @endphp
 
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Church <span class="text-red-500">*</span></label>
-                        <select name="church_id"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
-                                   focus:outline-none focus:ring-2 focus:ring-navy
-                                   @error('church_id') border-red-400 @enderror">
-                            <option value="">— Select District first —</option>
-                            <template x-for="church in churches" :key="church.id">
-                                <option :value="church.id" x-text="church.name"
-                                        :selected="church.id == {{ (int) old('church_id',0) }}"></option>
-                            </template>
-                        </select>
-                        @error('church_id')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
-                    </div>
+                    @if($lockedChurch)
+                        {{-- Church is locked from the batch registration code --}}
+                        <input type="hidden" name="church_id" value="{{ $lockedChurch->id }}"/>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">District</label>
+                            <p class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700">
+                                {{ $lockedChurch->district?->name ?? '—' }}
+                            </p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Church</label>
+                            <p class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700">
+                                {{ $lockedChurch->name }}
+                            </p>
+                            <p class="text-xs text-gray-400 mt-1">&#128274; Your church is set from your registration code and cannot be changed.</p>
+                        </div>
+                    @else
+                        {{-- Free selection for individually-issued codes --}}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">District <span class="text-red-500">*</span></label>
+                            <select x-model="districtId" @change="loadChurches()"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                                       focus:outline-none focus:ring-2 focus:ring-navy">
+                                <option value="">— Select District —</option>
+                                @foreach($districts as $district)
+                                    <option value="{{ $district->id }}" {{ old('district_id')==$district->id ? 'selected' : '' }}>
+                                        {{ $district->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Church <span class="text-red-500">*</span></label>
+                            <select name="church_id"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                                       focus:outline-none focus:ring-2 focus:ring-navy
+                                       @error('church_id') border-red-400 @enderror">
+                                <option value="">— Select District first —</option>
+                                <template x-for="church in churches" :key="church.id">
+                                    <option :value="church.id" x-text="church.name"
+                                            :selected="church.id == {{ (int) old('church_id',0) }}"></option>
+                                </template>
+                            </select>
+                            @error('church_id')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
+                        </div>
+                    @endif
 
                     {{-- Ministry (auto from category — read only) --}}
                     <div>
@@ -325,11 +352,16 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Senior Youth Group <span class="text-red-500">*</span>
                         </label>
-                        <select name="club_rank" x-model="selectedClubRank"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none">
+                        <select name="club_rank"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
+                                   focus:outline-none focus:ring-2 focus:ring-navy">
                             <option value="">— Select —</option>
-                            <option value="Ambassador">Ambassador (Ages 16–21)</option>
-                            <option value="Young Adults">Young Adults (Ages 22+)</option>
+                            <option value="Ambassador" {{ old('club_rank')==='Ambassador' ? 'selected' : '' }}>
+                                Ambassador (Ages 16–21)
+                            </option>
+                            <option value="Young Adults" {{ old('club_rank')==='Young Adults' ? 'selected' : '' }}>
+                                Young Adults (Ages 22+)
+                            </option>
                         </select>
                         <p class="text-xs text-gray-400 mt-1">Ambassador (16–21 years) &bull; Young Adults (22 years and above)</p>
                     </div>
