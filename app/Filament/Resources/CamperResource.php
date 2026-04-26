@@ -11,6 +11,8 @@ use App\Models\District;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -28,6 +30,90 @@ class CamperResource extends Resource
         return auth()->user()->hasAnyRole(['secretariat', 'super_admin']);
     }
 
+    // ── Infolist (View page) ───────────────────────────────────────────────────
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist->schema([
+
+            Infolists\Components\Section::make('Identity')
+                ->schema([
+                    // Photo — rendered via custom HTML entry
+                    Infolists\Components\TextEntry::make('photo_url')
+                        ->label('Passport Photo')
+                        ->state(fn (Camper $record): string => $record->getFirstMedia('photo')
+                            ? route('camper.photo', $record->id)
+                            : '')
+                        ->formatStateUsing(function (string $state, Camper $record): \Illuminate\Support\HtmlString {
+                            if (! $state) {
+                                return new \Illuminate\Support\HtmlString(
+                                    '<div style="width:120px;height:120px;border-radius:12px;background:#F1F5F9;'
+                                    . 'display:flex;align-items:center;justify-content:center;font-size:3rem;color:#94A3B8">'
+                                    . '&#128100;</div>'
+                                );
+                            }
+                            return new \Illuminate\Support\HtmlString(
+                                '<img src="' . e($state) . '" '
+                                . 'style="width:120px;height:120px;border-radius:12px;object-fit:cover;'
+                                . 'object-position:top center;border:2px solid #E2E8F0;display:block;" '
+                                . 'alt="Photo of ' . e($record->full_name) . '"/>'
+                            );
+                        })
+                        ->html()
+                        ->columnSpanFull(),
+
+                    Infolists\Components\TextEntry::make('full_name')->label('Full Name'),
+                    Infolists\Components\TextEntry::make('phone'),
+                    Infolists\Components\TextEntry::make('camper_number')->label('Camper Number')->copyable(),
+                    Infolists\Components\TextEntry::make('category')
+                        ->label('Department')
+                        ->badge()
+                        ->formatStateUsing(fn ($state) => $state instanceof CamperCategory ? $state->label() : $state),
+                ])->columns(2),
+
+            Infolists\Components\Section::make('Personal Details')
+                ->schema([
+                    Infolists\Components\TextEntry::make('gender')
+                        ->formatStateUsing(fn ($state) => $state instanceof \App\Enums\Gender ? ucfirst($state->value) : $state),
+                    Infolists\Components\TextEntry::make('date_of_birth')->date('d M Y')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('club_rank')->label('Club Rank / Group')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('home_address')->placeholder('—')->columnSpanFull(),
+                ])->columns(2),
+
+            Infolists\Components\Section::make('Church & Ministry')
+                ->schema([
+                    Infolists\Components\TextEntry::make('church.name')->label('Church'),
+                    Infolists\Components\TextEntry::make('church.district.name')->label('District'),
+                    Infolists\Components\TextEntry::make('ministry')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('created_at')->label('Registered On')->dateTime('d M Y, H:i'),
+                ])->columns(2),
+
+            Infolists\Components\Section::make('Documents & Consent')
+                ->schema([
+                    Infolists\Components\TextEntry::make('id_card_path')
+                        ->label('ID Card')
+                        ->state(fn (Camper $r) => $r->id_card_path ? 'Generated ✓' : 'Not yet generated')
+                        ->badge()
+                        ->color(fn (Camper $r) => $r->id_card_path ? 'success' : 'warning'),
+
+                    Infolists\Components\TextEntry::make('consent_form_path')
+                        ->label('Consent Form PDF')
+                        ->state(fn (Camper $r) => $r->consent_form_path ? 'Generated ✓' : 'Not required / not yet generated')
+                        ->badge()
+                        ->color(fn (Camper $r) => $r->consent_form_path ? 'success' : 'gray'),
+
+                    Infolists\Components\IconEntry::make('consent_collected')
+                        ->label('Physical Consent Collected')
+                        ->boolean()
+                        ->trueIcon('heroicon-o-check-circle')
+                        ->falseIcon('heroicon-o-x-circle')
+                        ->trueColor('success')
+                        ->falseColor('danger'),
+                ])->columns(3),
+
+        ]);
+    }
+
     // ── Form ──────────────────────────────────────────────────────────────────
 
     public static function form(Form $form): Form
@@ -36,6 +122,29 @@ class CamperResource extends Resource
 
             Forms\Components\Section::make('Identity')
                 ->schema([
+                    // Photo display — uses typed parameter so Filament injects the model correctly
+                    Forms\Components\Placeholder::make('photo_display')
+                        ->label('Passport Photo')
+                        ->content(function (?Camper $record): \Illuminate\Support\HtmlString {
+                            if (! $record?->id || ! $record->getFirstMedia('photo')) {
+                                return new \Illuminate\Support\HtmlString(
+                                    '<div style="width:100px;height:100px;border-radius:12px;'
+                                    . 'background:#F1F5F9;display:flex;align-items:center;'
+                                    . 'justify-content:center;font-size:2.5rem;color:#94A3B8">'
+                                    . '&#128100;</div>'
+                                );
+                            }
+                            $url = route('camper.photo', $record->id);
+                            return new \Illuminate\Support\HtmlString(
+                                '<img src="' . e($url) . '" '
+                                . 'style="width:100px;height:100px;border-radius:12px;'
+                                . 'object-fit:cover;object-position:top center;'
+                                . 'border:2px solid #E2E8F0;display:block;" '
+                                . 'alt="Passport photo of ' . e($record->full_name) . '"/>'
+                            );
+                        })
+                        ->columnSpanFull(),
+
                     Forms\Components\TextInput::make('full_name')
                         ->disabled()
                         ->helperText('Copied from payment record. Cannot be changed here.'),
@@ -101,8 +210,13 @@ class CamperResource extends Resource
                 ->schema([
                     Forms\Components\Toggle::make('consent_collected')
                         ->label('Consent Form Collected')
-                        ->helperText('Mark this when the signed physical form has been received at check-in.')
-                        ->onColor('success'),
+                        ->helperText('Mark this when the signed physical form has been received at check-in.'),
+
+                    Forms\Components\Toggle::make('consent_collected')
+                        ->label('Consent Form Collected')
+                        ->helperText('Tick this when the signed physical form has been received at check-in.')
+                        ->onIcon('heroicon-o-document-check')
+                        ->offIcon('heroicon-o-document'),
                 ])->visibleOn('edit'),
         ]);
     }
@@ -116,7 +230,9 @@ class CamperResource extends Resource
                 Tables\Columns\ImageColumn::make('photo')
                     ->circular()
                     ->defaultImageUrl(asset('images/placeholder-avatar.png'))
-                    ->getStateUsing(fn (Camper $r) => $r->getFirstMediaUrl('photo', 'thumb')),
+                    ->getStateUsing(fn (Camper $r) => $r->getFirstMedia('photo')
+                        ? route('camper.photo', $r->id)
+                        : null),
 
                 Tables\Columns\TextColumn::make('full_name')
                     ->searchable()
@@ -209,16 +325,18 @@ class CamperResource extends Resource
                     ->toggle(),
             ])
             ->actions([
+                Tables\Actions\Action::make('mark_consent_collected')
+                    ->label('Mark Consent Collected')
+                    ->icon('heroicon-o-document-check')
+                    ->color('success')
+                    ->visible(fn (Camper $r) => $r->requiresConsentForm() && ! $r->consent_collected)
+                    ->requiresConfirmation()
+                    ->modalHeading('Mark consent form as collected?')
+                    ->modalDescription(fn (Camper $r) => "Confirm that the signed physical consent form for {$r->full_name} has been received.")
+                    ->action(fn (Camper $r) => $r->update(['consent_collected' => true])),
+
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
-
-                Tables\Actions\Action::make('mark_consent')
-                    ->label('Mark Consent Collected')
-                    ->icon('heroicon-o-clipboard-document-check')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->visible(fn (Camper $r) => ! $r->consent_collected && $r->requiresConsentForm())
-                    ->action(fn (Camper $record) => $record->update(['consent_collected' => true])),
 
                 Tables\Actions\Action::make('regenerate_docs')
                     ->label('Regenerate Documents')

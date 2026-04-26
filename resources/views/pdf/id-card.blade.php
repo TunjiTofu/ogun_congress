@@ -5,184 +5,162 @@
     <style>
         @page {
             margin: 0;
-            size: 85.6mm 53.98mm;
+            size: 54mm 86mm;
         }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
-            margin: 0;
-            padding: 0;
-            width: 85.6mm;
-            height: 53.98mm;
+            width: 54mm;
+            height: 86mm;
             overflow: hidden;
             font-family: DejaVu Sans, Arial, sans-serif;
-            font-size: 7pt;
-            color: #1A1A1A;
+            font-size: 6.5pt;
+            color: #111827;
         }
         .card {
-            width: 85.6mm;
-            height: 53.98mm;
+            width: 54mm;
+            height: 86mm;
             overflow: hidden;
-            display: block;
-            page-break-inside: avoid;
-            page-break-after: avoid;
             position: relative;
             background: #FFFFFF;
+            page-break-inside: avoid;
+            page-break-after: avoid;
         }
 
-        /* ── Top band ───────────────────────────────────────────────────────── */
-        .hd {
-            display: block;
-            width: 85.6mm;
-            height: 8mm;
-            background: {{ $badgeColor }};
-            overflow: hidden;
-        }
-        .hd-inner {
+        /* ── Top colour band ──────────────────── */
+        .top-band {
             display: table;
-            width: 100%;
-            height: 8mm;
+            width: 54mm;
+            height: 10mm;
+            background: {{ $badgeColor }};
             padding: 0 2mm;
         }
-        .hd-left  { display: table-cell; vertical-align: middle; }
-        .hd-right { display: table-cell; vertical-align: middle; text-align: right; }
-
-        .logo-img {
-            width: 5.5mm;
-            height: 5.5mm;
-            border-radius: 50%;
-            display: inline-block;
+        .top-band-row { display: table-row; }
+        .top-band-left, .top-band-right {
+            display: table-cell;
             vertical-align: middle;
         }
-        .camp-title {
-            display: inline-block;
-            vertical-align: middle;
-            margin-left: 1.5mm;
-            color: #FFFFFF;
-        }
-        .camp-name { font-size: 5.5pt; font-weight: bold; letter-spacing: 0.3pt; }
-        .camp-sub  { font-size: 4pt;   color: rgba(255,255,255,0.8); }
-        .camp-year { font-size: 6pt;   font-weight: bold; color: #FFFFFF; }
+        .top-band-right { text-align: right; }
 
-        /* ── Body ───────────────────────────────────────────────────────────── */
-        .body {
+        .band-logo {
+            width: 7mm; height: 7mm; border-radius: 50%;
+            vertical-align: middle; display: inline-block;
+        }
+        .band-title {
+            display: inline-block; vertical-align: middle;
+            margin-left: 1mm; color: #fff;
+        }
+        .band-name { font-size: 5pt; font-weight: bold; line-height: 1.3; }
+        .band-sub  { font-size: 3.8pt; color: rgba(255,255,255,0.75); }
+        .band-year { font-size: 6pt; font-weight: bold; color: #fff; }
+
+        /* ── Photo block ──────────────────────── */
+        .photo-block {
+            padding: 2mm 2mm 1mm;
             display: table;
-            width: 85.6mm;
-            height: 38mm;
-            padding: 1.5mm 1.5mm 0 1.5mm;
+            width: 100%;
         }
-        .col-photo   { display: table-cell; width: 22mm; vertical-align: top; }
-        .col-info    { display: table-cell; vertical-align: top; padding-left: 1.5mm; }
-        .col-qr      { display: table-cell; width: 18mm; vertical-align: top; text-align: center; }
+        .photo-col { display: table-cell; width: 18mm; vertical-align: top; }
+        .info-col  { display: table-cell; vertical-align: top; padding-left: 1.5mm; }
 
-        /* Photo */
         .photo-box {
-            width: 19mm;
-            height: 24mm;
-            border: 0.5pt solid #CCCCCC;
-            overflow: hidden;
-            background: #F5F5F5;
+            width: 18mm; height: 22mm;
+            border: 0.4pt solid #D1D5DB;
+            overflow: hidden; background: #F9FAFB;
         }
-        .photo-box img {
-            width: 19mm;
-            height: 24mm;
-            display: block;
-        }
-        .no-photo {
-            width: 19mm;
-            height: 24mm;
-            font-size: 5pt;
-            color: #AAAAAA;
-            text-align: center;
-            padding-top: 8mm;
-        }
+        .photo-box img { width: 18mm; height: 22mm; display: block; object-fit: cover; object-position: top; }
+        .no-photo { width: 18mm; height: 22mm; display: table-cell; vertical-align: middle; text-align: center; font-size: 5pt; color: #9CA3AF; }
 
-        /* Info */
+        /* ── Name & badge ─────────────────────── */
         .camper-name {
-            font-size: 8.5pt;
-            font-weight: bold;
-            color: #0B2D6B;
-            line-height: 1.15;
-            max-width: 36mm;
-            word-wrap: break-word;
+            font-size: 7pt; font-weight: bold; color: {{ $badgeColor }};
+            line-height: 1.2; word-wrap: break-word; max-width: 30mm;
         }
         .camper-code {
             font-family: DejaVu Sans Mono, monospace;
-            font-size: 5.5pt;
-            color: #666666;
-            letter-spacing: 0.4pt;
-            margin-top: 0.5mm;
+            font-size: 4.8pt; color: #6B7280; letter-spacing: 0.3pt; margin-top: 0.5mm;
         }
-        .badge {
+        .dept-badge {
             display: inline-block;
             background: {{ $badgeColor }};
-            color: #FFFFFF;
-            font-size: 5pt;
-            font-weight: bold;
-            padding: 0.3mm 1.5mm;
-            margin-top: 1mm;
+            color: #fff; font-size: 4.5pt; font-weight: bold;
+            padding: 0.3mm 1.2mm; margin-top: 0.8mm;
         }
 
-        .lbl { font-size: 4pt; color: #999999; text-transform: uppercase; letter-spacing: 0.2pt; }
-        .val { font-size: 5.5pt; font-weight: bold; color: #1A1A1A; line-height: 1.2; max-width: 33mm; word-wrap: break-word; }
-        .row { margin-top: 1.2mm; }
-
-        /* QR */
-        .qr-img {
-            width: 16mm;
-            height: 16mm;
-            display: block;
-            margin: 0 auto;
-            border: 0.3pt solid #EEEEEE;
+        /* ── Details table ────────────────────── */
+        .details {
+            width: calc(54mm - 4mm);
+            margin: 0 2mm;
+            border-top: 0.3pt solid #E5E7EB;
+            padding-top: 1.2mm;
         }
-        .qr-lbl {
-            font-size: 3.8pt;
-            color: #AAAAAA;
-            text-align: center;
-            margin-top: 0.5mm;
-            letter-spacing: 0.1pt;
+        .detail-row { display: table; width: 100%; margin-bottom: 0.9mm; }
+        .detail-lbl {
+            display: table-cell; width: 14mm;
+            font-size: 4.5pt; color: #9CA3AF;
+            text-transform: uppercase; letter-spacing: 0.2pt;
+            vertical-align: top; padding-top: 0.1mm;
+        }
+        .detail-val {
+            display: table-cell;
+            font-size: 5.8pt; font-weight: bold; color: #111827;
+            line-height: 1.25; word-wrap: break-word; max-width: 32mm;
         }
 
-        /* ── Footer ─────────────────────────────────────────────────────────── */
-        .ft {
-            display: table;
-            width: 85.6mm;
-            height: 7.98mm;
+        /* ── QR block ─────────────────────────── */
+        .qr-block {
+            display: table; width: calc(54mm - 4mm);
+            margin: 1.5mm 2mm 0;
+            border-top: 0.3pt solid #E5E7EB;
+            padding-top: 1.5mm;
+        }
+        .qr-left  { display: table-cell; vertical-align: middle; }
+        .qr-right { display: table-cell; width: 16mm; vertical-align: middle; text-align: right; }
+        .qr-img   { width: 15mm; height: 15mm; display: block; }
+        .qr-text  { font-size: 4pt; color: #9CA3AF; line-height: 1.4; }
+        .qr-text strong { color: {{ $badgeColor }}; font-size: 4.5pt; }
+
+        /* ── Footer band ──────────────────────── */
+        .bottom-band {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            height: 6mm;
             background: {{ $badgeColor }}18;
             border-top: 0.4pt solid {{ $badgeColor }}44;
-            padding: 0 2mm;
+            display: table; width: 54mm; padding: 0 2mm;
         }
-        .ft-inner { display: table-row; }
-        .ft-l { display: table-cell; vertical-align: middle; font-size: 4pt; color: #777777; }
-        .ft-r { display: table-cell; vertical-align: middle; text-align: right; font-size: 4pt; color: #777777; }
+        .bottom-band-row { display: table-row; }
+        .bottom-lft, .bottom-rgt {
+            display: table-cell; vertical-align: middle;
+            font-size: 3.8pt; color: #9CA3AF;
+        }
+        .bottom-rgt { text-align: right; }
     </style>
 </head>
 <body>
 <div class="card">
 
-    {{-- Header --}}
-    <div class="hd">
-        <div class="hd-inner">
-            <div class="hd-left">
+    {{-- Top band --}}
+    <div class="top-band">
+        <div class="top-band-row">
+            <div class="top-band-left">
                 @php $logoPath = public_path('images/logo.svg'); @endphp
                 @if(file_exists($logoPath))
                     <img src="data:image/svg+xml;base64,{{ base64_encode(file_get_contents($logoPath)) }}"
-                         class="logo-img" alt="Logo"/>
+                         class="band-logo" alt="Logo"/>
                 @endif
-                <div class="camp-title">
-                    <div class="camp-name">{{ $campName }}</div>
-                    <div class="camp-sub">SDA &mdash; Ogun Conference</div>
+                <div class="band-title">
+                    <div class="band-name">{{ $campName }}</div>
+                    <div class="band-sub">SDA · Ogun Conference</div>
                 </div>
             </div>
-            <div class="hd-right">
-                <div class="camp-year">{{ $campYear }}</div>
+            <div class="top-band-right">
+                <div class="band-year">{{ $campYear }}</div>
             </div>
         </div>
     </div>
 
-    {{-- Body --}}
-    <div class="body">
-
-        {{-- Photo column --}}
-        <div class="col-photo">
+    {{-- Photo + Name --}}
+    <div class="photo-block">
+        <div class="photo-col">
             <div class="photo-box">
                 @if($photoBase64)
                     <img src="{{ $photoBase64 }}" alt="Photo"/>
@@ -191,43 +169,52 @@
                 @endif
             </div>
         </div>
-
-        {{-- Info column --}}
-        <div class="col-info">
+        <div class="info-col">
             <div class="camper-name">{{ $camper->full_name }}</div>
             <div class="camper-code">{{ $camper->camper_number }}</div>
-            <div class="badge">{{ $camper->category->label() }}</div>
-
-            <div class="row">
-                <div class="lbl">Church</div>
-                <div class="val">{{ $camper->church?->name ?? '&mdash;' }}</div>
-            </div>
-            <div class="row">
-                <div class="lbl">District</div>
-                <div class="val">{{ $camper->church?->district?->name ?? '&mdash;' }}</div>
-            </div>
-            @if($camper->club_rank)
-                <div class="row">
-                    <div class="lbl">Rank</div>
-                    <div class="val">{{ $camper->club_rank }}</div>
-                </div>
-            @endif
+            <div class="dept-badge">{{ $camper->category->label() }}@if($camper->club_rank) · {{ $camper->club_rank }}@endif</div>
         </div>
+    </div>
 
-        {{-- QR column --}}
-        <div class="col-qr">
-            {{-- $qrCode is a data:image/png;base64,... URL --}}
+    {{-- Details --}}
+    <div class="details">
+        <div class="detail-row">
+            <div class="detail-lbl">Church</div>
+            <div class="detail-val">{{ $camper->church?->name ?? '—' }}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-lbl">District</div>
+            <div class="detail-val">{{ $camper->church?->district?->name ?? '—' }}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-lbl">Gender</div>
+            <div class="detail-val" style="text-transform:capitalize">{{ $camper->gender?->value ?? '—' }}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-lbl">Registered</div>
+            <div class="detail-val">{{ $camper->created_at->format('d M Y') }}</div>
+        </div>
+    </div>
+
+    {{-- QR code --}}
+    <div class="qr-block">
+        <div class="qr-left">
+            <div class="qr-text">
+                <strong>Scan to verify</strong><br/>
+                Valid for {{ $campYear }}.<br/>
+                SDA Ogun Conference
+            </div>
+        </div>
+        <div class="qr-right">
             <img src="{{ $qrCode }}" class="qr-img" alt="QR"/>
-            <div class="qr-lbl">Scan to verify</div>
         </div>
-
     </div>
 
     {{-- Footer --}}
-    <div class="ft">
-        <div class="ft-inner">
-            <div class="ft-l">Seventh-day Adventist Church</div>
-            <div class="ft-r">Valid {{ $campYear }}</div>
+    <div class="bottom-band">
+        <div class="bottom-band-row">
+            <div class="bottom-lft">Seventh-day Adventist Church</div>
+            <div class="bottom-rgt">&#10003; Official ID</div>
         </div>
     </div>
 

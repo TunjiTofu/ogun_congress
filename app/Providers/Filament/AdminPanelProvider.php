@@ -42,8 +42,8 @@ class AdminPanelProvider extends PanelProvider
                 'success' => Color::Green,
                 'info'    => Color::Blue,
             ])
-            ->brandName('Ogun Youth Congress')
-            ->brandLogo(asset('images/logo.svg'))
+            ->brandName('Ogun Conference Youth Congress')
+            ->brandLogo(asset('images/congress_logo.png'))
             ->brandLogoHeight('2.5rem')
             ->favicon(asset('images/favicon.svg'))
             ->navigationGroups([

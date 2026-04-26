@@ -64,7 +64,7 @@ class CamperPortalController extends Controller
 
         $registrationCode = RegistrationCode::where('code', $code)
             ->where('status', 'CLAIMED')
-            ->with(['camper.church.district'])
+            ->with(['camper.church.district', 'camper.health', 'camper.contacts', 'camper.checkinEvents'])
             ->firstOrFail();
 
         $camper = $registrationCode->camper;

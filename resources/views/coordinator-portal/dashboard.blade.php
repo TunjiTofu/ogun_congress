@@ -169,9 +169,11 @@
                 @forelse($batch->entries as $entry)
                     <div class="camper-row">
                         <div style="display:flex;align-items:center;gap:0.75rem;flex:1;">
-                            @if($entry->registrationCode?->camper?->getFirstMediaUrl('photo','thumb'))
-                                <img src="{{ $entry->registrationCode->camper->getFirstMediaUrl('photo','thumb') }}"
-                                     class="camper-avatar" alt="Photo"/>
+                            @if($entry->registrationCode?->camper?->getFirstMedia('photo'))
+                                <img src="{{ route('camper.photo', $entry->registrationCode->camper->id) }}"
+                                     class="camper-avatar" alt="Photo"
+                                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+                                <div class="camper-avatar-placeholder" style="display:none">&#128100;</div>
                             @else
                                 <div class="camper-avatar-placeholder">&#128100;</div>
                             @endif

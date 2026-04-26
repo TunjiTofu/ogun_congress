@@ -30,7 +30,9 @@ class ViewCamper extends ViewRecord
                     Grid::make(4)->schema([
                         ImageEntry::make('photo')
                             ->label('Photo')
-                            ->getStateUsing(fn ($record) => $record->getFirstMediaUrl('photo', 'thumb'))
+                            ->getStateUsing(fn ($record) => $record->getFirstMedia('photo')
+                                ? route('camper.photo', $record->id)
+                                : null)
                             ->circular()
                             ->columnSpan(1),
 

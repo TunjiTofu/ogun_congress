@@ -33,6 +33,12 @@
             districtId: '{{ old("district_id","") }}',
             churches: [],
             selectedClubRank: '{{ old("club_rank","") }}',
+            seniorYouthRank: '{{ old("club_rank","") }}',
+
+            get computedClubRank() {
+                if (this.category === 'senior_youth') return this.seniorYouthRank;
+                return this.selectedClubRank;
+            },
 
             get categoryLabel() {
                 return {adventurer:'Adventurer',pathfinder:'Pathfinder',senior_youth:'Senior Youth'}[this.category] ?? '';
@@ -90,8 +96,7 @@
                     this.validationError = 'Please select your club rank / class.'; return false;
                 }
                 if (this.category === 'senior_youth') {
-                    const srGroup = document.querySelector('select[name="club_rank"]')?.value;
-                    if (!srGroup) { this.validationError = 'Please select your Senior Youth group.'; return false; }
+                    if (!this.seniorYouthRank) { this.validationError = 'Please select your Senior Youth group.'; return false; }
                 }
                 return true;
             },
@@ -331,12 +336,15 @@
                                   bg-gray-50 text-gray-600"/>
                     </div>
 
+                    {{-- Single hidden input carries the actual club_rank value --}}
+                    <input type="hidden" name="club_rank" :value="computedClubRank"/>
+
                     {{-- Club Rank — Adventurers & Pathfinders --}}
                     <div x-show="availableRanks.length > 0">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Club Rank / Class <span class="text-red-500">*</span>
                         </label>
-                        <select name="club_rank" x-model="selectedClubRank"
+                        <select x-model="selectedClubRank"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
                                    focus:outline-none focus:ring-2 focus:ring-navy">
                             <option value="">— Select your rank —</option>
@@ -352,7 +360,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Senior Youth Group <span class="text-red-500">*</span>
                         </label>
-                        <select name="club_rank"
+                        <select x-model="seniorYouthRank"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white
                                    focus:outline-none focus:ring-2 focus:ring-navy">
                             <option value="">— Select —</option>

@@ -25,7 +25,7 @@ class DocumentGenerationService
             'badgeColor'  => $badgeColor,
             'campName'    => setting('camp_name', 'Ogun Youth Camp'),
             'campYear'    => now()->year,
-        ])->setPaper([0, 0, 242.65, 153.01], 'landscape');
+        ])->setPaper([0, 0, 153.01, 243.78], 'portrait');
 
         $path = 'id-cards/' . $camper->camper_number . '.pdf';
         Storage::disk('private')->put($path, $pdf->output());

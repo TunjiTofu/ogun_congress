@@ -61,7 +61,7 @@
 
 {{-- Letterhead --}}
 <div class="letterhead">
-    @php $logoPath = public_path('images/logo.svg'); @endphp
+    @php $logoPath = public_path('images/congress_logo.png'); @endphp
     @if(file_exists($logoPath))
         <div style="margin-bottom:3mm;">
             <img src="data:image/svg+xml;base64,{{ base64_encode(file_get_contents($logoPath)) }}"

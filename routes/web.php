@@ -5,6 +5,30 @@ use App\Http\Controllers\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
 
+// ── Camper photo server (serves from Spatie MediaLibrary disk path) ──────────────
+// This bypasses symlink and URL issues by reading the file directly from disk.
+Route::get('/camper-photo/{camper}', function (\App\Models\Camper $camper) {
+    $media = $camper->getFirstMedia('photo');
+
+    if (! $media) {
+        abort(404);
+    }
+
+    // Prefer thumb conversion; fall back to original
+    $path = ($media->hasGeneratedConversion('thumb') && file_exists($media->getPath('thumb')))
+        ? $media->getPath('thumb')
+        : $media->getPath();
+
+    if (! file_exists($path)) {
+        abort(404);
+    }
+
+    return response()->file($path, [
+        'Content-Type'  => $media->mime_type ?: 'image/jpeg',
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+})->where('camper', '[0-9]+')->name('camper.photo');
+
 // ── Permanent storage file server ─────────────────────────────────────────────
 // Serves files from storage/app/public WITHOUT requiring `storage:link` symlink.
 // This route intercepts /storage/* requests and streams them directly.
@@ -25,7 +49,7 @@ Route::get('/storage/{path}', function (string $path) {
 
 // ── Camper QR verification (public — scanned from ID card) ──────────────────────
 Route::get('/verify/{camper_number}', function (string $camper_number) {
-    $camper = \App\Models\Camper::with(['church.district'])
+    $camper = \App\Models\Camper::with(['church.district', 'health', 'contacts'])
         ->where('camper_number', $camper_number)
         ->firstOrFail();
 
