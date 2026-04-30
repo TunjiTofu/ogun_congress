@@ -1,0 +1,74 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\CamperCategory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class BulkRegistrationBatch extends Model
+{
+    protected $fillable = [
+        'church_id',
+        'created_by',
+        'status',
+        'expected_total',
+        'amount_paid',
+        'bank_name',
+        'deposit_date',
+        'proof_image_path',
+        'confirmed_by',
+        'confirmed_at',
+        'rejection_reason',
+        'notes',
+        'paystack_reference',
+        'payment_type',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'expected_total' => 'decimal:2',
+            'amount_paid'    => 'decimal:2',
+            'deposit_date'   => 'date',
+            'confirmed_at'   => 'datetime',
+        ];
+    }
+
+    public function church(): BelongsTo
+    {
+        return $this->belongsTo(Church::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function confirmedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function entries(): HasMany
+    {
+        return $this->hasMany(BulkRegistrationEntry::class, 'batch_id');
+    }
+
+    public function isDraft(): bool         { return $this->status === 'draft'; }
+    public function isPendingPayment(): bool { return $this->status === 'pending_payment'; }
+    public function isConfirmed(): bool      { return $this->status === 'confirmed'; }
+    public function isOnlinePayment(): bool  { return $this->payment_type === 'online'; }
+    public function isOfflinePayment(): bool { return $this->payment_type === 'offline'; }
+
+    /**
+     * Recalculate the expected total from entry fees.
+     * Uses a fresh DB query to avoid stale relationship cache.
+     */
+    public function recalculateTotal(): void
+    {
+        $total = \App\Models\BulkRegistrationEntry::where('batch_id', $this->id)->sum('fee');
+        $this->updateQuietly(['expected_total' => $total]);
+    }
+}
