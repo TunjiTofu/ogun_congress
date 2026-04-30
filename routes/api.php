@@ -1,0 +1,59 @@
+<?php
+
+use App\Http\Controllers\CheckinController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\RegistrationController;
+use Illuminate\Support\Facades\Route;
+
+// ── Public webhook (no auth, no CSRF — excluded in bootstrap/app.php) ─────────
+Route::post('/webhooks/paystack', [PaymentController::class, 'webhook'])
+    ->name('webhooks.paystack');
+
+// ── Public API (rate-limited, no auth) ────────────────────────────────────────
+Route::prefix('v1')->name('api.')->group(function () {
+
+    // Payment
+    Route::prefix('payment')->name('payment.')->group(function () {
+        Route::post('initiate', [PaymentController::class, 'initiate'])
+            ->middleware('throttle:payment_initiate')
+            ->name('initiate');
+
+        Route::get('status/{code}', [PaymentController::class, 'status'])
+            ->name('status');
+    });
+
+    // Registration
+    Route::prefix('registration')->name('registration.')->group(function () {
+        Route::post('validate-code', [RegistrationController::class, 'validateCode'])
+            ->middleware('throttle:code_validate')
+            ->name('validate-code');
+
+        Route::post('submit', [RegistrationController::class, 'submit'])
+            ->name('submit');
+
+        Route::get('downloads/{code}', [RegistrationController::class, 'downloads'])
+            ->name('downloads');
+    });
+});
+
+// ── Offline check-in PWA API (Sanctum token auth) ─────────────────────────────
+Route::prefix('checkin')->name('checkin.')->group(function () {
+
+    // Auth — no token required
+    Route::post('auth', [CheckinController::class, 'auth'])
+        ->name('auth');
+
+    // Protected endpoints — require valid Sanctum token with [checkin] ability
+    Route::middleware(['auth:sanctum', 'ability:checkin'])->group(function () {
+        Route::get('sync', [CheckinController::class, 'sync'])
+            ->middleware('throttle:checkin_api')
+            ->name('sync');
+
+        Route::post('events', [CheckinController::class, 'storeEvents'])
+            ->name('events');
+
+        Route::get('camper/{code}', [CheckinController::class, 'camper'])
+            ->middleware('throttle:checkin_api')
+            ->name('camper');
+    });
+});
