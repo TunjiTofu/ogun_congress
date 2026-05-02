@@ -5,7 +5,7 @@ use App\Http\Controllers\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
 
-// ── Camper photo server (serves from Spatie MediaLibrary disk path) ──────────────
+// ── Camper photo server (serves from Spatie MediaLibrary disk path) ─────────────
 // This bypasses symlink and URL issues by reading the file directly from disk.
 Route::get('/camper-photo/{camper}', function (\App\Models\Camper $camper) {
     $media = $camper->getFirstMedia('photo');
