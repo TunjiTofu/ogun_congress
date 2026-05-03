@@ -34,6 +34,28 @@ class BulkRegistrationBatchResource extends Resource
     {
         return $form->schema([
 
+            // Rejection banner — shown only when batch is rejected
+            Forms\Components\Section::make('⚠️ Payment Rejected — Action Required')
+                ->schema([
+                    Forms\Components\Placeholder::make('rejection_notice')
+                        ->label('')
+                        ->content(function (?\App\Models\BulkRegistrationBatch $record): \Illuminate\Support\HtmlString {
+                            if (! $record?->rejection_reason) {
+                                return new \Illuminate\Support\HtmlString('');
+                            }
+                            return new \Illuminate\Support\HtmlString(
+                                '<div style="background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:8px;'
+                                . 'padding:14px 16px;color:#991B1B;font-size:0.88rem;line-height:1.7">'
+                                . '<strong style="display:block;font-size:0.95rem;margin-bottom:6px">'
+                                . '❌ This batch was rejected. Please fix the issue and save to resubmit.</strong>'
+                                . '<strong>Reason from accountant:</strong> ' . e($record->rejection_reason)
+                                . '</div>'
+                            );
+                        }),
+                ])
+                ->visible(fn (?\App\Models\BulkRegistrationBatch $record) => $record?->status === 'rejected')
+                ->collapsible(false),
+
             Forms\Components\Section::make('Batch Details')
                 ->schema([
                     // Coordinator: church is auto-set from their profile (read-only)
@@ -89,14 +111,35 @@ class BulkRegistrationBatchResource extends Resource
                         ->prefix('₦')
                         ->helperText('Must match the expected total exactly.'),
 
+                    Forms\Components\Placeholder::make('proof_preview')
+                        ->label('Current Payment Proof')
+                        ->content(function ($record): \Illuminate\Support\HtmlString {
+                            if (! $record?->proof_image_path) {
+                                return new \Illuminate\Support\HtmlString(
+                                    '<span style="color:#94A3B8;font-size:0.82rem">No proof uploaded yet.</span>'
+                                );
+                            }
+                            $url = route('proof.image', ['path' => base64_encode($record->proof_image_path)]);
+                            return new \Illuminate\Support\HtmlString(
+                                '<a href="' . e($url) . '" target="_blank">'
+                                . '<img src="' . e($url) . '" '
+                                . 'style="max-width:100%;max-height:200px;border-radius:8px;'
+                                . 'border:1px solid #E2E8F0;cursor:pointer;display:block" '
+                                . 'alt="Payment proof"/>'
+                                . '</a>'
+                                . '<p style="font-size:0.7rem;color:#94A3B8;margin-top:4px">Click image to open full size</p>'
+                            );
+                        })
+                        ->columnSpanFull(),
+
                     Forms\Components\FileUpload::make('proof_image_path')
-                        ->label('Payment Proof / Teller Upload')
+                        ->label('Upload / Replace Proof Image')
                         ->image()
                         ->disk('public')
                         ->directory('bulk-payment-proofs')
                         ->visibility('public')
-                        ->imagePreviewHeight('120')
-                        ->helperText('Upload a photo of the bank teller or transfer receipt.'),
+                        ->helperText('Upload a new image to replace the existing proof.')
+                        ->columnSpanFull(),
                 ])
                 ->columns(2)
                 ->collapsed(fn ($record) => $record?->isDraft()),
@@ -280,10 +323,12 @@ class BulkRegistrationBatchResource extends Resource
 
                 Tables\Columns\ImageColumn::make('proof_image_path')
                     ->label('Proof')
-                    ->disk('public')
                     ->height(40)
                     ->width(60)
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->getStateUsing(fn ($record) => $record->proof_image_path
+                        ? route('proof.image', ['path' => base64_encode($record->proof_image_path)])
+                        : null),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created')
@@ -301,7 +346,13 @@ class BulkRegistrationBatchResource extends Resource
                     ]),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\ViewAction::make()
+                    ->visible(fn () => auth()->user()->hasRole('accountant')
+                        && ! auth()->user()->hasRole('super_admin')),
+
+                Tables\Actions\EditAction::make()
+                    ->visible(fn () => ! auth()->user()->hasRole('accountant')
+                        || auth()->user()->hasRole('super_admin')),
 
                 // Pay online via Paystack
                 Tables\Actions\Action::make('pay_paystack')
@@ -417,12 +468,32 @@ class BulkRegistrationBatchResource extends Resource
             ]);
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            \App\Filament\Resources\BulkRegistrationBatchResource\RelationManagers\EntriesRelationManager::class,
+        ];
+    }
+
     public static function getPages(): array
     {
         return [
             'index'  => Pages\ListBulkBatches::route('/'),
             'create' => Pages\CreateBulkBatch::route('/create'),
+            'view'   => Pages\ViewBulkBatch::route('/{record}'),
             'edit'   => Pages\EditBulkBatch::route('/{record}/edit'),
         ];
+    }
+
+    // Route accountants to the view page, coordinators/admins to edit
+    public static function getRecordUrl(\Illuminate\Database\Eloquent\Model $record): ?string
+    {
+        $user = auth()->user();
+
+        if ($user->hasRole('accountant') && ! $user->hasRole('super_admin')) {
+            return static::getUrl('view', ['record' => $record]);
+        }
+
+        return static::getUrl('edit', ['record' => $record]);
     }
 }
