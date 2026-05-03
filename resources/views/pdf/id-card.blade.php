@@ -274,8 +274,9 @@
                 </div>
             </td>
             <td class="qr-cell">
-                {{-- $qrCode is a raw SVG string — embedded inline for reliable DomPDF rendering --}}
-                {!! $qrCode !!}
+                @if($qrCode)
+                    <img src="{{ $qrCode }}" style="width:15mm;height:15mm;display:block;margin-left:auto" alt="QR"/>
+                @endif
             </td>
         </tr></table>
 

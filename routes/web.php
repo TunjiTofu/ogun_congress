@@ -168,3 +168,27 @@ Route::prefix('coordinator-portal')->name('coordinator.portal.')->group(function
 
 // ── Contact form ───────────────────────────────────────────────────────────────
 Route::post('/contact', [App\Http\Controllers\ContactController::class, 'store'])->name('contact.store');
+
+
+// TEMPORARY DEBUG — remove after checking
+Route::get('/debug-photo/{camper}', function (\App\Models\Camper $camper) {
+    $media = $camper->getFirstMedia('photo');
+    if (! $media) return 'NO MEDIA RECORD';
+
+    $spatieOriginal = $media->getPath();
+    $spatieThumb    = $media->hasGeneratedConversion('thumb') ? $media->getPath('thumb') : 'no thumb';
+
+    return response()->json([
+        'media_id'        => $media->id,
+        'disk'            => $media->disk,
+        'file_name'       => $media->file_name,
+        'mime_type'       => $media->mime_type,
+        'spatie_original' => $spatieOriginal,
+        'original_exists' => file_exists($spatieOriginal),
+        'spatie_thumb'    => $spatieThumb,
+        'thumb_exists'    => $media->hasGeneratedConversion('thumb') ? file_exists($spatieThumb) : false,
+        'storage_path'    => storage_path('app/public'),
+        'media_path_raw'  => storage_path('app/public/' . $media->id . '/' . $media->file_name),
+        'media_path_raw_exists' => file_exists(storage_path('app/public/' . $media->id . '/' . $media->file_name)),
+    ]);
+})->where('camper', '[0-9]+');

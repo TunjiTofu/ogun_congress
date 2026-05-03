@@ -16,33 +16,39 @@ class GenerateCamperDocumentsJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries   = 3;
-    public int $timeout = 60; // seconds
+    public int $timeout = 120;
 
-    public function __construct(private readonly int $camperId)
-    {
-        $this->onQueue('documents');
-    }
+    public function __construct(public readonly int $camperId) {}
 
     public function handle(DocumentGenerationService $documentService): void
     {
-        $camper = Camper::with(['church.district', 'registrationCode'])
+        // Always fresh-load with media relation so getFirstMedia() is never stale.
+        // This is critical — if the job runs immediately after registration,
+        // a cached $camper without media loaded would return null from getFirstMedia().
+        $camper = Camper::with(['media', 'church.district', 'contacts'])
             ->findOrFail($this->camperId);
 
+        Log::info('GenerateCamperDocumentsJob: starting', [
+            'camper_number' => $camper->camper_number,
+            'has_photo'     => $camper->getFirstMedia('photo') !== null,
+        ]);
+
+        // Generate ID card
         $documentService->generateIdCard($camper);
 
+        // Generate consent form only for campers requiring parental consent
         if ($camper->requiresConsentForm()) {
             $documentService->generateConsentForm($camper);
         }
 
-        Log::info('docs.generated', [
+        Log::info('GenerateCamperDocumentsJob: complete', [
             'camper_number' => $camper->camper_number,
-            'consent_form'  => $camper->requiresConsentForm(),
         ]);
     }
 
     public function failed(\Throwable $exception): void
     {
-        Log::error('docs.generation_failed', [
+        Log::error('GenerateCamperDocumentsJob: failed', [
             'camper_id' => $this->camperId,
             'error'     => $exception->getMessage(),
         ]);

@@ -10,12 +10,11 @@ use App\Jobs\SendRegistrationConfirmationSmsJob;
 use App\Models\Camper;
 use App\Models\CamperContact;
 use App\Models\CamperHealth;
-use App\Models\Church;
 use App\Models\RegistrationCode;
 use App\Repositories\Interfaces\RegistrationCodeRepositoryInterface;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class RegistrationService
@@ -27,7 +26,7 @@ class RegistrationService
     /**
      * Validate an incoming registration code and return prefill data.
      *
-     * @return array{ code: string, prefill_name: string, prefill_phone: string, amount_paid: float|null, payment_type: string }
+     * @return array
      * @throws ValidationException
      */
     public function validateCode(string $code): array
@@ -65,10 +64,7 @@ class RegistrationService
     /**
      * Complete a camper's registration.
      *
-     * All writes happen inside a single DB transaction.
-     * The code is locked for update to prevent concurrent submissions.
-     *
-     * @param  array  $data  Validated data from SubmitRegistrationRequest
+     * @param  array  $data
      * @return Camper
      * @throws ValidationException|\Throwable
      */
@@ -91,8 +87,7 @@ class RegistrationService
                 ]);
             }
 
-            // ── 2. Determine category ────────────────────────────────────────
-            // Priority: locked category from payment (prefill_category) → form field
+            // ── 2. Determine category ─────────────────────────────────────────
             $lockedCategory = $registrationCode->prefill_category
                 ?? ($data['locked_category'] ?? null)
                 ?? ($data['category_locked'] ?? null);
@@ -105,18 +100,15 @@ class RegistrationService
 
             $category = CamperCategory::from($lockedCategory);
 
-            // DOB is optional — stored if provided but not required for category
-            $dob = ! empty($data['date_of_birth']) ? Carbon::parse($data['date_of_birth']) : null;
-
             // ── 3. Create the Camper record ───────────────────────────────────
-            // Full name and phone are always pulled from the registration code —
-            // any values submitted in the form POST are intentionally ignored.
             $camper = Camper::create([
                 'registration_code_id' => $registrationCode->id,
                 'camper_number'        => $registrationCode->code,
                 'full_name'            => $registrationCode->prefill_name,
                 'phone'                => $registrationCode->prefill_phone,
-                'date_of_birth'        => isset($data['date_of_birth']) && $data['date_of_birth'] !== '' ? $data['date_of_birth'] : null,
+                'date_of_birth'        => isset($data['date_of_birth']) && $data['date_of_birth'] !== ''
+                    ? $data['date_of_birth']
+                    : null,
                 'gender'               => $data['gender'],
                 'category'             => $category,
                 'home_address'         => $data['home_address'] ?? null,
@@ -125,39 +117,27 @@ class RegistrationService
                 'club_rank'            => $data['club_rank'] ?? null,
             ]);
 
-            // ── 4. Attach photo via Spatie MediaLibrary ───────────────────────
-//            if (! empty($data['photo'])) {
-//                $camper->addMedia($data['photo'])
-//                    ->toMediaCollection('photo');
-//            }
-
-            // ── Photo attachment — uses binary string to avoid /tmp cleanup issues ──
+            // ── 4. Attach photo ───────────────────────────────────────────────
+            // photo_contents = JPEG bytes pre-converted by RegistrationController::toJpeg()
+            // This guarantees DomPDF always receives JPEG regardless of original upload format.
             if (! empty($data['photo_contents'])) {
                 try {
                     $camper->addMediaFromString($data['photo_contents'])
-                        ->usingFileName($data['photo_filename'] ?? 'photo.jpg')
-                        ->setMimeType($data['photo_mime_type'] ?? 'image/jpeg')
-//                        ->withCustomProperties(['mime_type' => $data['photo_mime_type'] ?? 'image/jpeg'])
-                        ->toMediaCollection('photo');
+                        ->usingFileName('photo.jpg')
+                        ->toMediaCollection('photo', 'public');  // explicit disk
+
+                    Log::info('registration.photo_attached', ['camper_id' => $camper->id]);
                 } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning('Photo attachment failed', [
+                    Log::warning('registration.photo_failed', [
                         'camper_id' => $camper->id,
                         'error'     => $e->getMessage(),
                     ]);
                 }
-            } elseif (! empty($data['photo']) && $data['photo'] instanceof \Illuminate\Http\UploadedFile) {
-                // Fallback for direct API calls that still pass UploadedFile
-                try {
-                    $camper->addMedia($data['photo'])->toMediaCollection('photo');
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning('Photo attachment failed (UploadedFile)', [
-                        'camper_id' => $camper->id,
-                        'error'     => $e->getMessage(),
-                    ]);
-                }
+            } else {
+                Log::warning('registration.no_photo', ['camper_id' => $camper->id]);
             }
 
-            // ── 5. Create health record (always, even if all fields empty) ──────
+            // ── 5. Create health record ───────────────────────────────────────
             CamperHealth::create([
                 'camper_id'          => $camper->id,
                 'medical_conditions' => $data['medical_conditions'] ?? null,
@@ -165,7 +145,7 @@ class RegistrationService
                 'allergies'          => $data['allergies'] ?? null,
             ]);
 
-            // ── 6. Create parent/guardian contact (Adventurers & Pathfinders) ─
+            // ── 6. Create parent/guardian contact ─────────────────────────────
             if ($category->requiresParentalConsent()) {
                 CamperContact::create([
                     'camper_id'    => $camper->id,
@@ -181,8 +161,6 @@ class RegistrationService
             // ── 7. Mark code as CLAIMED ───────────────────────────────────────
             $this->codeRepository->markAsClaimed($registrationCode);
 
-            // Transaction commits here ─────────────────────────────────────────
-
             Log::info('registration.complete', [
                 'camper_number' => $camper->camper_number,
                 'category'      => $camper->category->value,
@@ -190,9 +168,7 @@ class RegistrationService
                 'payment_type'  => $registrationCode->payment_type->value,
             ]);
 
-            // ── 9. Dispatch async jobs ────────────────────────────────────────
-            // In production with Redis/Horizon, these are queued.
-            // With QUEUE_CONNECTION=sync (or database without a worker), they run inline.
+            // ── 8. Dispatch async jobs ────────────────────────────────────────
             GenerateCamperDocumentsJob::dispatch($camper->id);
 
             SendRegistrationConfirmationSmsJob::dispatch(
