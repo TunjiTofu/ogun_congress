@@ -18,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Force PHP to use user-writable tmp directory (shared hosting fix)
+        putenv('TMPDIR=/home2/gratusco/tmp');
+        ini_set('upload_tmp_dir', '/home2/gratusco/tmp');
+
         Model::preventLazyLoading(! app()->isProduction());
         Model::preventSilentlyDiscardingAttributes(! app()->isProduction());
 
