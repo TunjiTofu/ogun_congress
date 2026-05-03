@@ -340,6 +340,12 @@ class RegistrationController extends Controller
 
     public function success(string $code)
     {
-        return view('registration.success', compact('code'));
+        $registrationCode = \App\Models\RegistrationCode::where('code', $code)
+            ->where('status', \App\Enums\CodeStatus::CLAIMED)
+            ->firstOrFail();
+
+        $camper = $registrationCode->camper;
+
+        return view('registration.success', compact('code', 'camper'));
     }
 }
