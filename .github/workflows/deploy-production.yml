@@ -21,7 +21,7 @@ jobs:
           script: |
             set -e
 
-            PHP="/opt/alt/php84/usr/bin/php -d extension=phar.so -d extension=mbstring.so -d extension=dom.so -d extension=intl.so -d extension=posix.so -d extension=fileinfo.so -d extension=gd.so -d extension=xmlreader.so -d extension=xmlwriter.so -d extension=zip.so -d extension=pdo.so -d extension=pdo_mysql.so"
+            PHP="/opt/alt/php84/usr/bin/php -d memory_limit=512M -d extension=phar.so -d extension=mbstring.so -d extension=dom.so -d extension=intl.so -d extension=posix.so -d extension=fileinfo.so -d extension=gd.so -d extension=xmlreader.so -d extension=xmlwriter.so -d extension=zip.so -d extension=pdo.so -d extension=pdo_mysql.so"
 
             cd ~/public_html/oguncongress.gratus.com.ng
 
