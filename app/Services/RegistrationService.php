@@ -131,28 +131,28 @@ class RegistrationService
 //                    ->toMediaCollection('photo');
 //            }
 
-            // Support both stable_photo_path (from web form) and photo (from API)
-            $photoSource = $data['stable_photo_path'] ?? $data['photo'] ?? null;
-
-            if ($photoSource && file_exists($photoSource)) {
+            // ── Photo attachment — uses binary string to avoid /tmp cleanup issues ──
+            if (! empty($data['photo_contents'])) {
                 try {
-                    $camper->addMedia($photoSource)
+                    $camper->addMediaFromString($data['photo_contents'])
+                        ->usingFileName($data['photo_filename'] ?? 'photo.jpg')
+                        ->setMimeType($data['photo_mime_type'] ?? 'image/jpeg')
+//                        ->withCustomProperties(['mime_type' => $data['photo_mime_type'] ?? 'image/jpeg'])
                         ->toMediaCollection('photo');
                 } catch (\Throwable $e) {
-                    Log::warning('Photo upload skipped', [
-                        'camper' => $camper->id,
-                        'error'  => $e->getMessage(),
+                    \Illuminate\Support\Facades\Log::warning('Photo attachment failed', [
+                        'camper_id' => $camper->id,
+                        'error'     => $e->getMessage(),
                     ]);
                 }
-            } elseif ($photoSource instanceof \Illuminate\Http\UploadedFile) {
-                // API path — UploadedFile object passed directly
+            } elseif (! empty($data['photo']) && $data['photo'] instanceof \Illuminate\Http\UploadedFile) {
+                // Fallback for direct API calls that still pass UploadedFile
                 try {
-                    $camper->addMedia($photoSource)
-                        ->toMediaCollection('photo');
+                    $camper->addMedia($data['photo'])->toMediaCollection('photo');
                 } catch (\Throwable $e) {
-                    Log::warning('Photo upload skipped (UploadedFile)', [
-                        'camper' => $camper->id,
-                        'error'  => $e->getMessage(),
+                    \Illuminate\Support\Facades\Log::warning('Photo attachment failed (UploadedFile)', [
+                        'camper_id' => $camper->id,
+                        'error'     => $e->getMessage(),
                     ]);
                 }
             }
