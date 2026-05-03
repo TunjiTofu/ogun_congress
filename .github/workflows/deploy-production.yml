@@ -29,6 +29,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
+            echo "→ Restoring .user.ini..."
+            echo '; cPanel-generated php ini directives, do not edit' > public/.user.ini
+
             echo "→ Installing dependencies..."
             $PHP /usr/local/bin/composer install --no-scripts
 
