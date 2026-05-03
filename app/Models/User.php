@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,7 +14,7 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     use HasApiTokens;
     use HasFactory;
@@ -72,5 +74,17 @@ class User extends Authenticatable
     public function canAccessFilament(): bool
     {
         return $this->is_active;
+    }
+
+    // Add this instead:
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->is_active && $this->hasRole([
+                'super_admin',
+                'accountant',
+                'secretariat',
+                'security',
+                'church_coordinator',
+            ]);
     }
 }
