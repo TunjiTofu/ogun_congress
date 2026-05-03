@@ -5,7 +5,7 @@ use App\Http\Controllers\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
 
-// ── Camper photo server (serves from Spatie MediaLibrary disk path) ────────────
+// ── Camper photo server (serves from Spatie MediaLibrary disk path) ──────────────
 // This bypasses symlink and URL issues by reading the file directly from disk.
 Route::get('/camper-photo/{camper}', function (\App\Models\Camper $camper) {
     $media = $camper->getFirstMedia('photo');
@@ -14,17 +14,29 @@ Route::get('/camper-photo/{camper}', function (\App\Models\Camper $camper) {
         abort(404);
     }
 
-    // Prefer thumb conversion; fall back to original
-    $path = ($media->hasGeneratedConversion('thumb') && file_exists($media->getPath('thumb')))
-        ? $media->getPath('thumb')
-        : $media->getPath();
+    // Try thumb first, fall back to original
+    $path = null;
+    if ($media->hasGeneratedConversion('thumb')) {
+        $thumbPath = $media->getPath('thumb');
+        if (file_exists($thumbPath)) {
+            $path = $thumbPath;
+        }
+    }
+    if (! $path) {
+        $originalPath = $media->getPath();
+        if (file_exists($originalPath)) {
+            $path = $originalPath;
+        }
+    }
 
-    if (! file_exists($path)) {
+    if (! $path) {
         abort(404);
     }
 
+    $mimeType = $media->mime_type ?: mime_content_type($path) ?: 'image/jpeg';
+
     return response()->file($path, [
-        'Content-Type'  => $media->mime_type ?: 'image/jpeg',
+        'Content-Type'  => $mimeType,
         'Cache-Control' => 'public, max-age=86400',
     ]);
 })->where('camper', '[0-9]+')->name('camper.photo');
