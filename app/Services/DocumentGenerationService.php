@@ -100,7 +100,6 @@
 //    }
 //}
 
-
 namespace App\Services;
 
 use App\Models\Camper;
@@ -113,18 +112,18 @@ class DocumentGenerationService
 {
     public function generateIdCard(Camper $camper): string
     {
-        $qrCode = $this->generateQrCode($camper->camper_number, $camper->id);
+        $qrCode      = $this->generateQrCode($camper->camper_number, $camper->id);
         $photoBase64 = $this->encodePhotoBase64($camper);
-        $badgeColor = $camper->badge_color
+        $badgeColor  = $camper->badge_color
             ?? config("camp.badge_colors.{$camper->category->value}", '#1B3A6B');
 
         $pdf = Pdf::loadView('pdf.id-card', [
-            'camper' => $camper,
-            'qrCode' => $qrCode,
+            'camper'      => $camper,
+            'qrCode'      => $qrCode,
             'photoBase64' => $photoBase64,
-            'badgeColor' => $badgeColor,
-            'campName' => setting('camp_name', 'Ogun Youth Camp'),
-            'campYear' => now()->year,
+            'badgeColor'  => $badgeColor,
+            'campName'    => setting('camp_name', 'Ogun Youth Camp'),
+            'campYear'    => now()->year,
         ])->setPaper([0, 0, 153.01, 243.78], 'portrait');
 
         $path = 'id-cards/' . $camper->camper_number . '.pdf';
@@ -138,8 +137,8 @@ class DocumentGenerationService
     public function generateConsentForm(Camper $camper): string
     {
         $pdf = Pdf::loadView('pdf.consent-form', [
-            'camper' => $camper->load(['church.district', 'contacts']),
-            'campName' => setting('camp_name', 'Ogun Youth Camp'),
+            'camper'    => $camper->load(['church.district', 'contacts']),
+            'campName'  => setting('camp_name', 'Ogun Youth Camp'),
             'campDates' => setting('camp_dates', 'TBA'),
             'campVenue' => setting('camp_venue', 'TBA'),
         ])->setPaper('a4', 'portrait');
@@ -172,32 +171,33 @@ class DocumentGenerationService
         $verifyUrl = url('/verify/' . $camperNumber);
 
         // SVG renderer has zero PHP extension dependencies (no imagick, no gd)
-        $svg = (string)QrCode::format('svg')
-            ->size(300)
+        $svg = (string) QrCode::format('svg')
+            ->size(200)
             ->margin(1)
             ->errorCorrection('M')
             ->generate($verifyUrl);
 
-        // Store SVG on public disk so it can be accessed if needed
+        // Store SVG on public disk
         $qrPath = 'qr-codes/' . $camperNumber . '.svg';
         Storage::disk('public')->put($qrPath, $svg);
 
-        // Update camper record with QR path
+        // Update camper record
         if ($camperId) {
             \App\Models\Camper::where('id', $camperId)
                 ->update(['qr_code_path' => $qrPath]);
         }
 
-        // Return as base64 SVG data URL — valid in <img src=""> and DomPDF
-        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+        // Return the raw SVG string — embedded inline in the PDF template.
+        // DomPDF renders inline <svg> elements natively; img src data URLs for SVG are unreliable.
+        return $svg;
     }
 
     private function encodePhotoBase64(Camper $camper): string
     {
         $media = $camper->getFirstMedia('photo');
-        if (!$media) return '';
+        if (! $media) return '';
         $path = $media->hasGeneratedConversion('thumb') ? $media->getPath('thumb') : $media->getPath();
-        if (!file_exists($path)) return '';
+        if (! file_exists($path)) return '';
         return 'data:' . $media->mime_type . ';base64,' . base64_encode(file_get_contents($path));
     }
 }
