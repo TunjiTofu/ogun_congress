@@ -167,20 +167,53 @@ class RegistrationController extends Controller
      *
      * Handles the full multi-step form submission from the browser.
      */
+//    public function submitWeb(\App\Http\Requests\SubmitRegistrationRequest $request)
+//    {
+//        $data = $request->validated();
+//
+//        // Always pull the photo from $request->file() to guarantee we get
+//        // the UploadedFile object — $request->validated() can return the
+//        // tmp path string which disappears before addMedia() runs.
+//        if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
+//            $data['photo'] = $request->file('photo');
+//        } else {
+//            unset($data['photo']);
+//        }
+//
+//        $camper = $this->registrationService->submit($data);
+//
+//        return redirect()->route('registration.success', ['code' => $camper->camper_number]);
+//    }
+
     public function submitWeb(\App\Http\Requests\SubmitRegistrationRequest $request)
     {
         $data = $request->validated();
 
-        // Always pull the photo from $request->file() to guarantee we get
-        // the UploadedFile object — $request->validated() can return the
-        // tmp path string which disappears before addMedia() runs.
+        // Move the uploaded file to a stable path immediately.
+        // On shared hosting, PHP cleans /tmp before addMedia() can consume it.
+        $stablePhotoPath = null;
         if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
-            $data['photo'] = $request->file('photo');
-        } else {
-            unset($data['photo']);
+            $uploadedFile = $request->file('photo');
+            $stableDir    = storage_path('app/tmp-uploads');
+
+            if (! is_dir($stableDir)) {
+                mkdir($stableDir, 0755, true);
+            }
+
+            $stableName      = 'photo_' . uniqid() . '.' . $uploadedFile->getClientOriginalExtension();
+            $uploadedFile->move($stableDir, $stableName);
+            $stablePhotoPath = $stableDir . '/' . $stableName;
         }
 
+        $data['stable_photo_path'] = $stablePhotoPath;
+        unset($data['photo']);
+
         $camper = $this->registrationService->submit($data);
+
+        // Clean up if the service didn't consume it
+        if ($stablePhotoPath && file_exists($stablePhotoPath)) {
+            @unlink($stablePhotoPath);
+        }
 
         return redirect()->route('registration.success', ['code' => $camper->camper_number]);
     }

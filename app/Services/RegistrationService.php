@@ -126,9 +126,35 @@ class RegistrationService
             ]);
 
             // ── 4. Attach photo via Spatie MediaLibrary ───────────────────────
-            if (! empty($data['photo'])) {
-                $camper->addMedia($data['photo'])
-                    ->toMediaCollection('photo');
+//            if (! empty($data['photo'])) {
+//                $camper->addMedia($data['photo'])
+//                    ->toMediaCollection('photo');
+//            }
+
+            // Support both stable_photo_path (from web form) and photo (from API)
+            $photoSource = $data['stable_photo_path'] ?? $data['photo'] ?? null;
+
+            if ($photoSource && file_exists($photoSource)) {
+                try {
+                    $camper->addMedia($photoSource)
+                        ->toMediaCollection('photo');
+                } catch (\Throwable $e) {
+                    Log::warning('Photo upload skipped', [
+                        'camper' => $camper->id,
+                        'error'  => $e->getMessage(),
+                    ]);
+                }
+            } elseif ($photoSource instanceof \Illuminate\Http\UploadedFile) {
+                // API path — UploadedFile object passed directly
+                try {
+                    $camper->addMedia($photoSource)
+                        ->toMediaCollection('photo');
+                } catch (\Throwable $e) {
+                    Log::warning('Photo upload skipped (UploadedFile)', [
+                        'camper' => $camper->id,
+                        'error'  => $e->getMessage(),
+                    ]);
+                }
             }
 
             // ── 5. Create health record (always, even if all fields empty) ──────

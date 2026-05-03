@@ -24,3 +24,4 @@ Homestead.yaml
 Thumbs.db
 public/.user.ini
 public/php.ini
+/storage/app/tmp-uploads/
