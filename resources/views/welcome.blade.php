@@ -634,7 +634,7 @@
     <div class="hero-inner">
         <img src="{{ asset('images/congress_logo.png') }}" alt="Congress 2026 Logo" class="hero-logo"/>
 
-        <div class="hero-pill">✦ Abeokuta 2026 &nbsp;&bull;&nbsp; Aug 16–22 ✦</div>
+        <div class="hero-pill">✦ Abeokutaa 2026 &nbsp;&bull;&nbsp; Aug 16–22 ✦</div>
 
         <h1 class="hero-title">
             From the Word<br/><em>to the World</em>
