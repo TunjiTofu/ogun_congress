@@ -21,13 +21,17 @@ jobs:
           script: |
             set -e
 
-            PHP="/opt/alt/php84/usr/bin/php -d extension=phar.so -d extension=mbstring.so -d extension=dom.so -d extension=intl.so -d extension=posix.so -d extension=fileinfo.so -d extension=gd.so -d extension=xmlreader.so -d extension=xmlwriter.so -d extension=zip.so -d extension=pdo.so -d extension=pdo_mysql.so"
+            PHP="/opt/alt/php84/usr/bin/php -d memory_limit=512M -d extension=phar.so -d extension=mbstring.so -d extension=dom.so -d extension=intl.so -d extension=posix.so -d extension=fileinfo.so -d extension=gd.so -d extension=xmlreader.so -d extension=xmlwriter.so -d extension=zip.so -d extension=pdo.so -d extension=pdo_mysql.so"
 
             cd ~/public_html/oguncongress.gratus.com.ng
 
             echo "→ Pulling latest main branch..."
             git fetch origin main
             git reset --hard origin/main
+
+            echo "→ Restoring PHP handler and user.ini..."
+            grep -q 'alt-php84' public/.htaccess || printf '\n<IfModule mime_module>\n    AddHandler application/x-httpd-alt-php84 .php\n</IfModule>\n' >> public/.htaccess
+            echo '; cPanel-generated php ini directives, do not edit' > public/.user.ini
 
             echo "→ Installing dependencies..."
             $PHP /usr/local/bin/composer install --no-scripts
