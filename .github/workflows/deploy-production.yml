@@ -29,7 +29,8 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            echo "→ Restoring .user.ini..."
+            echo "→ Restoring PHP handler and user.ini..."
+            grep -q 'alt-php84' public/.htaccess || printf '\n<IfModule mime_module>\n    AddHandler application/x-httpd-alt-php84 .php\n</IfModule>\n' >> public/.htaccess
             echo '; cPanel-generated php ini directives, do not edit' > public/.user.ini
 
             echo "→ Installing dependencies..."
