@@ -2,6 +2,7 @@
 
 namespace App\Enums;
 
+// Enums
 enum CamperCategory: string
 {
     case ADVENTURER   = 'adventurer';
