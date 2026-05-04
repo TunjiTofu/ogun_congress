@@ -49,15 +49,9 @@ class CheckedInCampers extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        // Get IDs of campers whose LAST check-in/out event was a check_in
-        $checkedInIds = CheckinEvent::selectRaw('camper_id')
-            ->whereIn('id', function ($sub) {
-                $sub->selectRaw('MAX(id)')
-                    ->from('checkin_events')
-                    ->whereIn('event_type', ['check_in', 'check_out'])
-                    ->groupBy('camper_id');
-            })
-            ->where('event_type', 'check_in')
+        // Show ALL campers who have checked in today (whether currently in or out)
+        $checkedInIds = CheckinEvent::where('event_type', 'check_in')
+            ->distinct('camper_id')
             ->pluck('camper_id');
 
         return $table
@@ -66,7 +60,7 @@ class CheckedInCampers extends Page implements HasTable
                     ->whereIn('id', $checkedInIds)
                     ->with(['church.district', 'media'])
             )
-            ->heading('Currently Checked-In — ' . today()->format('d M Y'))
+            ->heading('Camp Check-In Register — ' . today()->format('d M Y'))
             ->defaultSort('full_name')
             ->columns([
                 Tables\Columns\ImageColumn::make('photo')
