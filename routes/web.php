@@ -184,3 +184,25 @@ Route::prefix('coordinator-portal')->name('coordinator.portal.')->group(function
 
 // ── Contact form ───────────────────────────────────────────────────────────────
 Route::post('/contact', [App\Http\Controllers\ContactController::class, 'store'])->name('contact.store');
+
+
+// PWA Check-in app (requires auth — secretariat/security)
+Route::middleware(['auth'])->prefix('checkin')->group(function () {
+    Route::get('/', [App\Http\Controllers\CheckinController::class, 'index'])->name('checkin.app');
+    Route::get('/manifest.json', function () {
+        return response()->file(public_path('checkin-manifest.json'), [
+            'Content-Type' => 'application/manifest+json',
+        ]);
+    });
+});
+
+// Add these to routes/web.php (inside auth middleware group):
+
+Route::middleware(['auth'])->prefix('attendance')->name('attendance.')->group(function () {
+    Route::get('session/{session}/export', [App\Http\Controllers\AttendanceController::class, 'exportSession'])
+        ->name('export.session');
+    Route::get('export-all', [App\Http\Controllers\AttendanceController::class, 'exportAll'])
+        ->name('export.all');
+    Route::get('daily-checkins', [App\Http\Controllers\AttendanceController::class, 'dailyCheckins'])
+        ->name('daily.checkins');
+});
