@@ -270,7 +270,9 @@
                         this.token         = data.token;
                         this.authenticated = true;
                         localStorage.setItem('checkin_token', data.token);
-                        this.syncData();
+                        // Sync immediately after login then flush any pending events
+                        await this.syncData();
+                        await this.syncEvents();
                         this.startCamera();
                     } else {
                         this.loginError = data.message || 'Invalid credentials. Please try again.';
@@ -367,7 +369,7 @@
                 if (this.online) {
                     try {
                         const res  = await fetch(`/api/checkin/camper/${encodeURIComponent(camperNumber)}`, {
-                            headers: { Authorization: `Bearer ${this.token}` }
+                            headers: apiHeaders(this.token),
                         });
                         const data = await res.json();
                         if (res.ok && data.success) {
@@ -517,7 +519,7 @@
 
                     while (hasMore) {
                         const res  = await fetch(`/api/checkin/sync?page=${page}&per_page=200`, {
-                            headers: { Authorization: `Bearer ${this.token}` }
+                            headers: apiHeaders(this.token),
                         });
                         if (!res.ok) throw new Error('Sync HTTP ' + res.status);
                         const data = await res.json();
@@ -557,7 +559,7 @@
                     const batch = events.slice(0, 50);
                     const res = await fetch('/api/checkin/events', {
                         method:  'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+                        headers: apiHeaders(this.token),
                         body:    JSON.stringify({ events: batch }),
                     });
                     const data = await res.json();
