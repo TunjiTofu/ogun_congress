@@ -20,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Exclude Paystack webhook from CSRF verification
         $middleware->validateCsrfTokens(except: [
             'api/webhooks/paystack',
+            'api/checkin/auth',
+            'api/webhooks/*',
         ]);
 
         // API middleware group
