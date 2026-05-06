@@ -256,7 +256,11 @@
                 try {
                     const res  = await fetch('/api/checkin/auth', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
                         body: JSON.stringify({ device_id: DEVICE_ID, email: this.loginEmail, pin: this.loginPin }),
                     });
                     const data = await res.json();
@@ -267,9 +271,12 @@
                         this.syncData();
                         this.startCamera();
                     } else {
-                        this.loginError = 'Invalid credentials. Please try again.';
+                        this.loginError = data.message || 'Invalid credentials. Please try again.';
                     }
-                } catch { this.loginError = 'Could not connect. Check your internet.'; }
+                } catch (e) {
+                    console.error('Login error:', e);
+                    this.loginError = 'Could not connect (' + e.message + '). Check the console for details.';
+                }
                 this.loggingIn = false;
             },
 
