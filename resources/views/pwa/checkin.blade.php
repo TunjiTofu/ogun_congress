@@ -134,7 +134,7 @@
             <div class="space-y-3">
                 <div x-show="resultStatus === 'already_in'"
                      class="bg-yellow-700/50 rounded-lg px-3 py-2 text-xs text-yellow-200">
-                    ⚠ Already checked in. Confirm only if re-entry is authorised.
+                    ⚠️ <strong>Already checked in.</strong> This camper has already been checked in. Use Check Out to remove them, or Reset to scan another.
                 </div>
 
                 <div x-show="result?.consent_required && !result?.consent_collected"
@@ -162,16 +162,38 @@
                 </div>
 
                 <div class="flex gap-2 pt-2">
-                    <button @click="checkIn(false)"
-                            x-show="!result?.consent_required || result?.consent_collected"
-                            class="flex-1 bg-green-600 font-bold py-3 rounded-xl text-sm hover:bg-green-500 transition">
-                        ✓ Check In
-                    </button>
-                    <button @click="checkIn(true)"
-                            x-show="result?.consent_required && !result?.consent_collected"
-                            class="flex-1 bg-green-600 font-bold py-3 rounded-xl text-sm hover:bg-green-500 transition">
-                        ✓ Check In + Collect Consent
-                    </button>
+                    <!-- Check-in mode buttons -->
+                    <template x-if="mode === 'checkin'">
+                        <div class="flex gap-2 w-full">
+                            <button @click="checkIn(false)"
+                                    :disabled="result?.is_checked_in"
+                                    x-show="!result?.consent_required || result?.consent_collected"
+                                    class="flex-1 bg-green-600 font-bold py-3 rounded-xl text-sm hover:bg-green-500 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                                ✓ Check In
+                            </button>
+                            <button @click="checkIn(true)"
+                                    :disabled="result?.is_checked_in"
+                                    x-show="result?.consent_required && !result?.consent_collected"
+                                    class="flex-1 bg-green-600 font-bold py-3 rounded-xl text-sm hover:bg-green-500 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                                ✓ Check In + Collect Consent
+                            </button>
+                            <button @click="doCheckOut()"
+                                    x-show="result?.is_checked_in"
+                                    class="bg-red-700 font-bold px-4 py-3 rounded-xl text-sm hover:bg-red-600 transition">
+                                🚪 Out
+                            </button>
+                        </div>
+                    </template>
+                    <!-- Attendance mode buttons -->
+                    <template x-if="mode === 'attendance'">
+                        <div class="flex gap-2 w-full">
+                            <button @click="markAttendance()"
+                                    :disabled="!selectedSessionId"
+                                    class="flex-1 bg-blue-600 font-bold py-3 rounded-xl text-sm hover:bg-blue-500 transition disabled:opacity-40">
+                                📋 Mark Present
+                            </button>
+                        </div>
+                    </template>
                     <button @click="reset()"
                             class="bg-gray-700 font-bold px-4 py-3 rounded-xl text-sm hover:bg-gray-600 transition">
                         Reset
@@ -201,11 +223,14 @@
             loggingIn:     false,
 
             // State
-            online:        navigator.onLine,
-            syncing:       false,
-            cameraOn:      false,
-            scanInterval:  null,
-            videoStream:   null,
+            online:          navigator.onLine,
+            syncing:         false,
+            cameraOn:        false,
+            scanInterval:    null,
+            videoStream:     null,
+            mode:            localStorage.getItem('checkin_mode') || 'checkin',
+            sessions:        [],
+            selectedSessionId: '',
 
             // Scan result
             result:        null,
@@ -289,7 +314,16 @@
             // ── Lookup ────────────────────────────────────────────────────────
 
             handleScan(raw) {
-                const code = raw.startsWith('OGN:') ? raw.slice(4) : raw;
+                let code = raw.trim();
+                // Handle full URL: http://...../verify/OGN-2026-XXXX
+                if (code.includes('/verify/')) {
+                    code = code.split('/verify/').pop().split('?')[0].trim();
+                }
+                // Handle OGN: prefix
+                if (code.startsWith('OGN:')) {
+                    code = code.slice(4);
+                }
+                code = code.toUpperCase();
                 this.stopCamera();
                 this.lookup(code);
             },
@@ -300,31 +334,74 @@
             },
 
             async lookup(camperNumber) {
+                if (!camperNumber || camperNumber.length < 3) {
+                    this.resultStatus = 'not_found';
+                    this.result = null;
+                    return;
+                }
+
                 this.scannedCode = camperNumber;
                 this.result      = null;
+                this.resultStatus = 'idle';
 
-                // Try online first
+                // Helper to read from IndexedDB properly
+                const readFromCache = async (code) => {
+                    const db = await this.getDB();
+                    return new Promise((resolve) => {
+                        const req = db.transaction('campers', 'readonly').objectStore('campers').get(code);
+                        req.onsuccess = () => resolve(req.result || null);
+                        req.onerror   = () => resolve(null);
+                    });
+                };
+
+                // Try online API first
                 if (this.online) {
                     try {
-                        const res  = await fetch(`/api/checkin/camper/${camperNumber}`, {
+                        const res  = await fetch(`/api/checkin/camper/${encodeURIComponent(camperNumber)}`, {
                             headers: { Authorization: `Bearer ${this.token}` }
                         });
                         const data = await res.json();
-                        if (data.success) {
+                        if (res.ok && data.success) {
                             this.result       = data.camper;
-                            this.resultStatus = data.camper.latest_event?.type === 'Check In' ? 'already_in' : 'found';
+                            this.resultStatus = data.camper.is_checked_in ? 'already_in' : 'found';
+                            // Update IndexedDB cache with latest check-in status
+                            const db = await this.getDB();
+                            db.transaction('campers', 'readwrite').objectStore('campers').put(data.camper, data.camper.camper_number);
                             return;
                         }
-                    } catch {}
+                        // 404 from API — camper genuinely doesn't exist
+                        if (res.status === 404) {
+                            this.result       = null;
+                            this.resultStatus = 'not_found';
+                            return;
+                        }
+                    } catch(e) {
+                        console.warn('Online lookup failed, falling back to cache', e);
+                    }
                 }
 
-                // Fall back to IndexedDB cache
-                const db     = await this.getDB();
-                const tx     = db.transaction('campers', 'readonly');
-                const record = await tx.objectStore('campers').get(camperNumber);
+                // Offline or API error — use IndexedDB cache
+                const record = await readFromCache(camperNumber);
                 if (record) {
                     this.result       = record;
-                    this.resultStatus = 'found';
+                    // Use cached is_checked_in if available, else check pending events
+                    const db     = await this.getDB();
+                    const events = await new Promise((resolve) => {
+                        const req = db.transaction('events', 'readonly').objectStore('events').getAll();
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror   = () => resolve([]);
+                    });
+                    const myEvents = events
+                        .filter(e => e.camper_number === camperNumber)
+                        .sort((a,b) => new Date(b.occurred_at) - new Date(a.occurred_at));
+
+                    const lastEvent = myEvents[0];
+                    const isIn = lastEvent
+                        ? lastEvent.event_type === 'check_in'
+                        : (record.is_checked_in || false);
+
+                    this.result.is_checked_in = isIn;
+                    this.resultStatus = isIn ? 'already_in' : 'found';
                 } else {
                     this.result       = null;
                     this.resultStatus = 'not_found';
@@ -334,29 +411,89 @@
             async checkIn(collectConsent) {
                 if (!this.result) return;
 
-                const event = {
+                // Prevent double check-in
+                if (this.result.is_checked_in) {
+                    alert(`⚠️ ${this.result.full_name} is already checked in!`);
+                    return;
+                }
+
+                await this.saveEvent({
                     uuid:              crypto.randomUUID(),
                     camper_number:     this.result.camper_number,
                     event_type:        'check_in',
-                    scanned_at:        new Date().toISOString(),
+                    occurred_at:       new Date().toISOString(),
                     device_id:         DEVICE_ID,
                     consent_collected: collectConsent,
-                };
+                });
 
-                // Save to IndexedDB queue
-                const db = await this.getDB();
-                await db.transaction('events', 'readwrite').objectStore('events').add(event);
-                this.updateStats();
+                // Update local record so UI reflects check-in immediately
+                if (this.result) this.result.is_checked_in = true;
 
-                // Try to sync immediately if online
-                if (this.online) this.syncEvents();
-
-                alert(`✓ ${this.result.full_name} checked in successfully!`);
+                alert(`✓ ${this.result?.full_name} checked in successfully!`);
                 this.reset();
                 this.startCamera();
             },
 
             reset() { this.result = null; this.resultStatus = 'idle'; this.scannedCode = ''; this.manualCode = ''; },
+
+            // ── Mode & attendance ──────────────────────────────────────────────
+
+            setMode(m) {
+                this.mode = m;
+                localStorage.setItem('checkin_mode', m);
+                this.reset();
+                if (m === 'attendance') this.loadSessions();
+            },
+
+            async loadSessions() {
+                if (!this.token) return;
+                try {
+                    const res = await fetch('/api/checkin/sessions', {
+                        headers: { Authorization: `Bearer ${this.token}` }
+                    });
+                    if (res.ok) this.sessions = await res.json();
+                } catch(e) { console.error('loadSessions failed', e); }
+            },
+
+            async saveEvent(event) {
+                const db = await this.getDB();
+                await new Promise((resolve, reject) => {
+                    const req = db.transaction('events', 'readwrite').objectStore('events').add(event);
+                    req.onsuccess = resolve;
+                    req.onerror   = reject;
+                });
+                this.updateStats();
+                if (this.online) await this.syncEvents();
+            },
+
+            async markAttendance() {
+                if (!this.result || !this.selectedSessionId) return;
+                await this.saveEvent({
+                    uuid:                 crypto.randomUUID(),
+                    camper_number:        this.result.camper_number,
+                    event_type:           'programme_attendance',
+                    programme_session_id: parseInt(this.selectedSessionId),
+                    occurred_at:          new Date().toISOString(),
+                    device_id:            DEVICE_ID,
+                });
+                alert(`📋 ${this.result.full_name} marked present!`);
+                this.reset();
+                this.startCamera();
+            },
+
+            async doCheckOut() {
+                if (!this.result) return;
+                await this.saveEvent({
+                    uuid:          crypto.randomUUID(),
+                    camper_number: this.result.camper_number,
+                    event_type:    'check_out',
+                    occurred_at:   new Date().toISOString(),
+                    device_id:     DEVICE_ID,
+                });
+                alert(`🚪 ${this.result.full_name} checked out.`);
+                this.reset();
+                this.startCamera();
+            },
 
             // ── Sync ──────────────────────────────────────────────────────────
 
@@ -366,45 +503,68 @@
                 if (!this.online || !this.token) return;
                 this.syncing = true;
                 try {
-                    let page = 1, hasMore = true;
+                    let page = 1, hasMore = true, totalSaved = 0;
                     const db = await this.getDB();
-                    const tx = db.transaction('campers', 'readwrite');
-                    const store = tx.objectStore('campers');
 
                     while (hasMore) {
-                        const res  = await fetch(`/api/checkin/sync?page=${page}`, { headers: { Authorization: `Bearer ${this.token}` } });
+                        const res  = await fetch(`/api/checkin/sync?page=${page}&per_page=200`, {
+                            headers: { Authorization: `Bearer ${this.token}` }
+                        });
+                        if (!res.ok) throw new Error('Sync HTTP ' + res.status);
                         const data = await res.json();
-                        for (const c of data.data) store.put(c, c.camper_number);
-                        hasMore = page < data.last_page;
+                        const campers = data.data || [];
+
+                        // Each camper stored in its own transaction to avoid timeout
+                        for (const c of campers) {
+                            const tx    = db.transaction('campers', 'readwrite');
+                            const store = tx.objectStore('campers');
+                            store.put(c, c.camper_number);
+                            totalSaved++;
+                        }
+
+                        hasMore = data.current_page < data.last_page;
                         page++;
                     }
-                    await tx.done;
+
+                    console.log(`Sync complete: ${totalSaved} campers cached`);
                     this.updateStats();
-                } catch (e) { console.error('Sync failed', e); }
+                } catch (e) {
+                    console.error('Sync failed', e);
+                }
                 this.syncing = false;
             },
 
             async syncEvents() {
                 if (!this.online || !this.token) return;
                 const db     = await this.getDB();
-                const events = await db.transaction('events', 'readonly').objectStore('events').getAll();
+                const events = await new Promise((resolve, reject) => {
+                    const req = db.transaction('events', 'readonly').objectStore('events').getAll();
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror   = reject;
+                });
                 if (!events.length) return;
 
                 try {
+                    const batch = events.slice(0, 50);
                     const res = await fetch('/api/checkin/events', {
                         method:  'POST',
                         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
-                        body:    JSON.stringify({ events: events.slice(0, 50) }),
+                        body:    JSON.stringify({ events: batch }),
                     });
                     const data = await res.json();
-                    if (data.success) {
-                        const tx = db.transaction('events', 'readwrite');
-                        const synced = events.slice(0, 50).map(e => e.uuid);
-                        for (const uuid of synced) tx.objectStore('events').delete(uuid);
-                        await tx.done;
+
+                    // API returns {saved: N, total: N} — if request succeeded, clear those events
+                    if (res.ok) {
+                        const syncedUuids = batch.map(e => e.uuid);
+                        for (const uuid of syncedUuids) {
+                            db.transaction('events', 'readwrite').objectStore('events').delete(uuid);
+                        }
+                        console.log(`Synced ${data.saved}/${data.total} events`);
                         this.updateStats();
                     }
-                } catch {}
+                } catch (e) {
+                    console.error('Event sync failed', e);
+                }
             },
 
             // ── IndexedDB ─────────────────────────────────────────────────────
@@ -427,12 +587,20 @@
 
             async updateStats() {
                 try {
-                    const db      = await this.getDB();
-                    const count   = await db.transaction('campers', 'readonly').objectStore('campers').count();
-                    const pending = await db.transaction('events',  'readonly').objectStore('events').count();
-                    this.cachedCount   = count;
-                    this.pendingEvents = pending;
-                } catch {}
+                    const db = await this.getDB();
+
+                    this.cachedCount = await new Promise((resolve, reject) => {
+                        const req = db.transaction('campers', 'readonly').objectStore('campers').count();
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror   = reject;
+                    });
+
+                    this.pendingEvents = await new Promise((resolve, reject) => {
+                        const req = db.transaction('events', 'readonly').objectStore('events').count();
+                        req.onsuccess = () => resolve(req.result);
+                        req.onerror   = reject;
+                    });
+                } catch(e) { console.error('updateStats failed', e); }
             },
         }
     }
