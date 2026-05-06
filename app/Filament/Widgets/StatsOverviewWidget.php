@@ -25,7 +25,7 @@ class StatsOverviewWidget extends BaseWidget
         $totalRegistered = Camper::count();
 
         $checkedInToday = CheckinEvent::where('event_type', CheckinEventType::CHECK_IN)
-            ->whereDate('scanned_at', today())
+            ->whereDate('occurred_at', today())
             ->distinct('camper_id')
             ->count();
 
