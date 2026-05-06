@@ -6,6 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#1B3A6B" />
+    <meta name="csrf-token" content="{{ csrf_token() }}"/>
     <title>Camp Check-In — {{ setting('camp_name', 'Ogun Youth Camp') }}</title>
     <link rel="manifest" href="/checkin-manifest.json" />
     <link rel="apple-touch-icon" href="{{ asset('images/favicon.png') }}" />
@@ -260,6 +261,7 @@
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
                         },
                         body: JSON.stringify({ device_id: DEVICE_ID, email: this.loginEmail, pin: this.loginPin }),
                     });
