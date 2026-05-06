@@ -207,6 +207,17 @@
 </div>
 
 <script>
+    // ── Global API headers helper ──────────────────────────────────────────────
+    function apiHeaders(token) {
+        return {
+            'Content-Type':     'application/json',
+            'Accept':           'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN':     document.querySelector('meta[name="csrf-token"]')?.content || '',
+            ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+        };
+    }
+
     const DEVICE_ID = (() => {
         let id = localStorage.getItem('checkin_device_id');
         if (!id) { id = crypto.randomUUID(); localStorage.setItem('checkin_device_id', id); }
@@ -270,9 +281,14 @@
                         this.token         = data.token;
                         this.authenticated = true;
                         localStorage.setItem('checkin_token', data.token);
+                        this.dbg('Login OK. Token length=' + (data.token?.length || 0));
                         // Sync immediately after login then flush any pending events
-                        await this.syncData();
-                        await this.syncEvents();
+                        try {
+                            await this.syncData();
+                            await this.syncEvents();
+                        } catch(syncErr) {
+                            this.dbg('Post-login sync threw: ' + syncErr.message);
+                        }
                         this.startCamera();
                     } else {
                         this.loginError = data.message || 'Invalid credentials. Please try again.';
@@ -508,10 +524,23 @@
 
             // ── Sync ──────────────────────────────────────────────────────────
 
-            async syncAll() { await Promise.all([this.syncData(), this.syncEvents()]); },
+            async syncAll() {
+                this.dbg('Manual sync triggered');
+                try {
+                    await this.syncData();
+                    await this.syncEvents();
+                    this.dbg('Manual sync complete');
+                } catch(e) {
+                    this.dbg('Manual sync threw: ' + e.message);
+                }
+            },
 
             async syncData() {
-                if (!this.online || !this.token) return;
+                this.dbg('syncData() called. online=' + this.online + ' hasToken=' + !!this.token);
+                if (!this.online || !this.token) {
+                    this.dbg('syncData() aborted — online or token missing');
+                    return;
+                }
                 this.syncing = true;
                 try {
                     let page = 1, hasMore = true, totalSaved = 0;
@@ -546,6 +575,7 @@
                     console.log(`Sync complete: ${totalSaved} campers cached`);
                     this.updateStats();
                 } catch (e) {
+                    this.dbg('SYNC ERROR: ' + e.message);
                     console.error('Sync failed', e);
                 }
                 this.syncing = false;
