@@ -518,10 +518,16 @@
                     const db = await this.getDB();
 
                     while (hasMore) {
+                        this.dbg(`GET /api/checkin/sync?page=${page}...`);
                         const res  = await fetch(`/api/checkin/sync?page=${page}&per_page=200`, {
                             headers: apiHeaders(this.token),
                         });
-                        if (!res.ok) throw new Error('Sync HTTP ' + res.status);
+                        this.dbg(`Sync response: HTTP ${res.status}`);
+                        if (!res.ok) {
+                            const t = await res.text();
+                            this.dbg(`Sync error body: ${t.substring(0, 100)}`);
+                            throw new Error('Sync HTTP ' + res.status);
+                        }
                         const data = await res.json();
                         const campers = data.data || [];
 
@@ -545,6 +551,17 @@
                 this.syncing = false;
             },
 
+            dbg(msg) {
+                const el = document.getElementById('debug-log');
+                if (el) {
+                    const line = document.createElement('div');
+                    line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+                    el.insertBefore(line, el.firstChild);
+                    while (el.children.length > 8) el.removeChild(el.lastChild);
+                }
+                console.log('[PWA]', msg);
+            },
+
             async syncEvents() {
                 if (!this.online || !this.token) return;
                 const db     = await this.getDB();
@@ -557,23 +574,29 @@
 
                 try {
                     const batch = events.slice(0, 50);
+                    this.dbg(`POST /api/checkin/events (${batch.length} events)...`);
                     const res = await fetch('/api/checkin/events', {
                         method:  'POST',
                         headers: apiHeaders(this.token),
                         body:    JSON.stringify({ events: batch }),
                     });
-                    const data = await res.json();
+                    const text = await res.text();
+                    this.dbg(`Events response: HTTP ${res.status} — ${text.substring(0, 80)}`);
 
-                    // API returns {saved: N, total: N} — if request succeeded, clear those events
                     if (res.ok) {
+                        let data = {};
+                        try { data = JSON.parse(text); } catch(e) {}
                         const syncedUuids = batch.map(e => e.uuid);
                         for (const uuid of syncedUuids) {
                             db.transaction('events', 'readwrite').objectStore('events').delete(uuid);
                         }
-                        console.log(`Synced ${data.saved}/${data.total} events`);
+                        this.dbg(`Cleared ${syncedUuids.length} events from queue`);
                         this.updateStats();
+                    } else {
+                        this.dbg(`Events FAILED: ${res.status} ${text.substring(0, 100)}`);
                     }
                 } catch (e) {
+                    this.dbg(`Events exception: ${e.message}`);
                     console.error('Event sync failed', e);
                 }
             },
