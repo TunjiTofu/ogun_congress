@@ -65,7 +65,7 @@ Route::post('checkin/auth', [App\Http\Controllers\CheckinController::class, 'aut
     ->name('checkin.auth');
 
 // Protected endpoints — require Sanctum token
-Route::middleware('auth:sanctum')->prefix('checkin')->group(function () {
+Route::middleware(['auth:sanctum'])->prefix('checkin')->group(function () {
     Route::get('sessions', [App\Http\Controllers\CheckinController::class, 'sessions'])->name('checkin.sessions');
     Route::get('sync',                [App\Http\Controllers\CheckinController::class, 'sync'])->name('checkin.sync');
     Route::get('camper/{identifier}', [App\Http\Controllers\CheckinController::class, 'lookup'])->name('checkin.lookup');
