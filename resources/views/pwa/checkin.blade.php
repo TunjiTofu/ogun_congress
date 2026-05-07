@@ -233,7 +233,10 @@
             'Accept':           'application/json',
             'X-Requested-With': 'XMLHttpRequest',
             'X-CSRF-TOKEN':     document.querySelector('meta[name="csrf-token"]')?.content || '',
+            // Standard Bearer token header
             ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+            // Fallback header for hosts that strip Authorization (e.g. cPanel Apache CGI)
+            ...(token ? { 'X-Api-Token': token } : {}),
         };
     }
 
