@@ -102,3 +102,11 @@ Route::get('debug-config', function() {
         'auth_guards'    => array_keys(config('auth.guards', [])),
     ]);
 });
+
+Route::get('debug-headers', function(\Illuminate\Http\Request $request) {
+    return response()->json([
+        'bearer_token'   => $request->bearerToken(),
+        'auth_header'    => $request->header('Authorization'),
+        'all_headers'    => $request->headers->all(),
+    ]);
+});

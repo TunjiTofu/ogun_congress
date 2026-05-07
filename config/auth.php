@@ -16,10 +16,10 @@ return [
         // Required by Sanctum's Guard when config('sanctum.guard') includes 'api'.
         // Session driver returns null for API requests (no session cookie),
         // so Sanctum falls through to its own Bearer token lookup — which works.
-//        'api' => [
-//            'driver'   => 'session',
-//            'provider' => 'users',
-//        ],
+        'api' => [
+            'driver'   => 'session',
+            'provider' => 'users',
+        ],
     ],
 
     'providers' => [
