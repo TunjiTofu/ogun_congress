@@ -59,7 +59,7 @@
     </div>
     <div class="summary-cell">
         <div class="summary-lbl">Generated At</div>
-        <div class="summary-val" style="font-size:10pt">{{ now()->format('H:i, d M') }}</div>
+        <div class="summary-val" style="font-size:10pt">{{ now()->format('g:i A, d M') }}</div>
     </div>
 </div>
 
@@ -85,7 +85,7 @@
             <td class="td-church">{{ $camper->church?->name ?? '—' }}</td>
             <td class="td-church">{{ $camper->church?->district?->name ?? '—' }}</td>
             <td class="td-time">
-                {{ $camper->attended_at ? \Illuminate\Support\Carbon::parse($camper->attended_at)->format('H:i') : '—' }}
+                {{ $camper->attended_at ? \Illuminate\Support\Carbon::parse($camper->attended_at)->format('g:i A') : '—' }}
             </td>
         </tr>
     @endforeach
@@ -100,7 +100,7 @@
 
 <div class="footer">
     Ogun Conference Youth Congress 2026 &bull; {{ setting('camp_venue','Abeokuta, Ogun State') }}
-    &bull; Printed: {{ now()->format('d M Y, H:i') }}
+    &bull; Printed: {{ now()->format('d M Y, g:i A') }}
 </div>
 </body>
 </html>

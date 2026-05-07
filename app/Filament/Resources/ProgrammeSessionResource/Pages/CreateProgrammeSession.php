@@ -16,4 +16,3 @@ class CreateProgrammeSession extends CreateRecord
         return $data;
     }
 }
-

@@ -95,7 +95,7 @@ class SessionAttendance extends Page implements HasTable
                         ->where('event_type', 'programme_attendance')
                         ->latest('occurred_at')
                         ->value('occurred_at'))
-                    ->dateTime('H:i, d M'),
+                    ->dateTime('g:i A, d M'),
             ])
             ->defaultSort('full_name')
             ->paginated([25, 50, 100])
