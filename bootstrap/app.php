@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Middleware\SetAppTimezone;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -25,9 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // API middleware group
-        $middleware->api(prepend: [
-            EnsureFrontendRequestsAreStateful::class,
-        ]);
+//        $middleware->api(prepend: [
+//            EnsureFrontendRequestsAreStateful::class,
+//        ]);
 
         // Aliases
         $middleware->alias([
@@ -37,7 +39,18 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // When an unauthenticated request hits an API endpoint,
+        // return a proper 401 JSON instead of crashing on route('login')
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Unauthenticated. Please log in to the check-in app.',
+                ], 401);
+            }
+
+            // Web requests → Filament login
+            return redirect()->route('filament.admin.auth.login');
+        });
     })
     ->withProviders([
         App\Providers\AppServiceProvider::class,

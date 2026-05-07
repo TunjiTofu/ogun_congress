@@ -84,3 +84,21 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json($sessions);
     })->name('api.programme.sessions');
 });
+
+
+// TEMPORARY DEBUG — remove after fixing
+Route::get('checkin/test', function () {
+    return response()->json(['ok' => true, 'campers' => \App\Models\Camper::count()]);
+});
+
+Route::middleware('auth:sanctum')->get('checkin/sync-test', function () {
+    return response()->json(['ok' => true, 'user' => auth()->user()->email]);
+});
+
+Route::get('debug-config', function() {
+    return response()->json([
+        'sanctum_guard'  => config('sanctum.guard'),
+        'auth_default'   => config('auth.defaults.guard'),
+        'auth_guards'    => array_keys(config('auth.guards', [])),
+    ]);
+});
