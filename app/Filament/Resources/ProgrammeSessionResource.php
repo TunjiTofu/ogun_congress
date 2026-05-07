@@ -45,13 +45,11 @@ class ProgrammeSessionResource extends Resource
                     Forms\Components\TimePicker::make('start_time')
                         ->required()
                         ->seconds(false)
-                        ->format('h:i A')
                         ->displayFormat('h:i A'),
 
                     Forms\Components\TimePicker::make('end_time')
                         ->nullable()
                         ->seconds(false)
-                        ->format('h:i A')
                         ->displayFormat('h:i A')
                         ->after('start_time'),
 

@@ -131,7 +131,7 @@ class AttendanceController extends Controller
                 $c->category?->label(),
                 $c->church?->name,
                 $c->church?->district?->name,
-                $c->attended_at ? Carbon::parse($c->attended_at)->format('H:i, d M Y') : '—',
+                $c->attended_at ? Carbon::parse($c->attended_at)->format('g:i A, d M Y') : '—',
             ];
         }
 
@@ -187,7 +187,7 @@ class AttendanceController extends Controller
                 $c->category?->label(),
                 $c->church?->name,
                 $c->church?->district?->name,
-                $e->occurred_at->format('H:i'),
+                $e->occurred_at->format('g:i A'),
             ];
         }
 
