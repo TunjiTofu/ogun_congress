@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ExtractBearerToken;
 use App\Http\Middleware\SetAppTimezone;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -27,9 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         // API middleware group
-//        $middleware->api(prepend: [
+        $middleware->api(prepend: [
 //            EnsureFrontendRequestsAreStateful::class,
-//        ]);
+            ExtractBearerToken::class,
+        ]);
 
         // Aliases
         $middleware->alias([
