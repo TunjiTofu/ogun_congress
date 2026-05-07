@@ -10,8 +10,6 @@ return new class extends Migration
     public function up(): void
     {
 
-        Schema::dropIfExists('programme_sessions');
-
         Schema::create('programme_sessions', function (Blueprint $table) {
             $table->id();
             $table->string('title');

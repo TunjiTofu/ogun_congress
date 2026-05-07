@@ -91,6 +91,43 @@
         </button>
     </div>
 
+    {{-- Mode selector --}}
+    <div class="flex rounded-xl bg-gray-800 p-1 gap-1">
+        <button @click="setMode('checkin')"
+                :class="mode === 'checkin' ? 'bg-blue-700 text-white' : 'text-gray-400 hover:text-white'"
+                class="flex-1 py-2.5 rounded-lg text-sm font-bold transition">
+            🚪 Check In / Out
+        </button>
+        <button @click="setMode('attendance')"
+                :class="mode === 'attendance' ? 'bg-blue-700 text-white' : 'text-gray-400 hover:text-white'"
+                class="flex-1 py-2.5 rounded-lg text-sm font-bold transition">
+            📋 Programme Attendance
+        </button>
+    </div>
+
+    {{-- Session picker (attendance mode only) --}}
+    <div x-show="mode === 'attendance'" class="space-y-2">
+        <div x-show="sessions.length === 0"
+             class="text-center text-gray-500 text-sm py-3 bg-gray-800 rounded-xl px-4">
+            No active sessions today. Ask the super admin to create one in the admin panel.
+        </div>
+        <div x-show="sessions.length > 0">
+            <label class="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">
+                Select Programme Session
+            </label>
+            <select x-model="selectedSessionId"
+                    class="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">— Choose a session —</option>
+                <template x-for="s in sessions" :key="s.id">
+                    <option :value="s.id"
+                            x-text="s.title + ' (' + (s.start_time ? s.start_time.substring(0,5) : '') + ')'"></option>
+                </template>
+            </select>
+            <p x-show="!selectedSessionId"
+               class="text-xs text-amber-400 mt-1">⚠ Select a session before scanning</p>
+        </div>
+    </div>
+
     {{-- Camera scanner --}}
     <div class="relative bg-black rounded-2xl overflow-hidden aspect-video">
         <video id="qr-video" class="w-full h-full object-cover" playsinline></video>

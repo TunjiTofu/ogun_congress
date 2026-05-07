@@ -44,11 +44,15 @@ class ProgrammeSessionResource extends Resource
 
                     Forms\Components\TimePicker::make('start_time')
                         ->required()
-                        ->seconds(false),
+                        ->seconds(false)
+                        ->format('h:i A')
+                        ->displayFormat('h:i A'),
 
                     Forms\Components\TimePicker::make('end_time')
                         ->nullable()
                         ->seconds(false)
+                        ->format('h:i A')
+                        ->displayFormat('h:i A')
                         ->after('start_time'),
 
                     Forms\Components\Toggle::make('is_active')
@@ -79,11 +83,11 @@ class ProgrammeSessionResource extends Resource
                     ->wrap(),
 
                 Tables\Columns\TextColumn::make('start_time')
-                    ->time('H:i')
+                    ->time('g:i A')
                     ->label('Start'),
 
                 Tables\Columns\TextColumn::make('end_time')
-                    ->time('H:i')
+                    ->time('g:i A')
                     ->label('End')
                     ->placeholder('—'),
 
