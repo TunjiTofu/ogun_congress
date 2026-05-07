@@ -144,7 +144,8 @@ class CheckedInCampers extends Page implements HasTable
                     ->color('gray')
                     ->modalHeading(fn ($record) => 'Check-In Trail — ' . $record->full_name)
                     ->modalContent(function ($record): HtmlString {
-                        $events = CheckinEvent::where('camper_id', $record->id)
+                        $events = CheckinEvent::with('recordedBy')
+                            ->where('camper_id', $record->id)
                             ->orderBy('occurred_at', 'desc')
                             ->get();
 
@@ -164,23 +165,29 @@ class CheckedInCampers extends Page implements HasTable
                             $label = $isIn ? 'Check In' : ($isOut ? 'Check Out' : 'Programme Attendance');
                             $color = $isIn ? '#065F46' : ($isOut ? '#991B1B' : '#1E40AF');
                             $bg    = $isIn ? '#D1FAE5' : ($isOut ? '#FEE2E2' : '#DBEAFE');
+                            $bdr   = $isIn ? '#6EE7B7' : ($isOut ? '#FCA5A5' : '#BFDBFE');
                             $time  = Carbon::parse($e->occurred_at)->format('g:i A, d M Y');
+                            $by    = $e->recordedBy?->name ?? 'Unknown';
                             $dev   = $e->device_id
-                                ? '<span style="font-size:0.68rem;color:#94A3B8;margin-left:6px">' . e($e->device_id) . '</span>'
+                                ? '<span style="font-size:0.65rem;color:#94A3B8"> · ' . e($e->device_id) . '</span>'
                                 : '';
 
-                            $rows .= '<div style="display:flex;align-items:center;gap:0.75rem;'
-                                . 'padding:0.65rem 0;border-bottom:1px solid #F1F5F9">'
-                                . '<span style="font-size:1.2rem;flex-shrink:0">' . $icon . '</span>'
-                                . '<div style="flex:1">'
+                            $rows .= '<div style="display:flex;align-items:flex-start;gap:0.75rem;'
+                                . 'padding:0.75rem 0;border-bottom:1px solid #F1F5F9">'
+                                . '<span style="font-size:1.3rem;flex-shrink:0;margin-top:2px">' . $icon . '</span>'
+                                . '<div style="flex:1;min-width:0">'
                                 . '<span style="display:inline-block;background:' . $bg . ';color:' . $color . ';'
-                                . 'font-size:0.72rem;font-weight:700;padding:0.15rem 0.6rem;border-radius:100px">'
-                                . $label . '</span>' . $dev . '</div>'
-                                . '<span style="font-size:0.78rem;color:#475569;white-space:nowrap">' . $time . '</span>'
+                                . 'border:1px solid ' . $bdr . ';font-size:0.72rem;font-weight:700;'
+                                . 'padding:2px 10px;border-radius:100px">' . $label . '</span>'
+                                . $dev
+                                . '<div style="font-size:0.72rem;color:#64748B;margin-top:3px">'
+                                . '🕐 ' . $time . ' &nbsp;·&nbsp; 👤 ' . e($by)
+                                . '</div>'
+                                . '</div>'
                                 . '</div>';
                         }
 
-                        return new HtmlString('<div style="padding:0 0.25rem">' . $rows . '</div>');
+                        return new HtmlString('<div style="padding:0 0.25rem;max-height:60vh;overflow-y:auto">' . $rows . '</div>');
                     })
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),

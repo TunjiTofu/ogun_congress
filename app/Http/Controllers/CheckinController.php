@@ -192,6 +192,11 @@ class CheckinController extends Controller
                     'recorded_by'          => auth()->id(),
                 ]);
 
+                // Mark consent collected on camper record
+                if (! empty($event['consent_collected'])) {
+                    $camper->update(['consent_collected' => true]);
+                }
+
                 $saved++;
 
             } catch (\Throwable $e) {
@@ -236,29 +241,38 @@ class CheckinController extends Controller
 
     private function formatCamper(Camper $c): array
     {
-        $lastEvent = CheckinEvent::where('camper_id', $c->id)
+        $lastEventType = CheckinEvent::where('camper_id', $c->id)
+            ->whereIn('event_type', ['check_in', 'check_out'])
             ->latest('occurred_at')
             ->value('event_type');
 
-        $isCheckedIn = $lastEvent instanceof CheckinEventType
-            ? $lastEvent === CheckinEventType::CHECK_IN
-            : $lastEvent === 'check_in';
+        $isCheckedIn = $lastEventType === 'check_in'
+            || (is_object($lastEventType) && $lastEventType === CheckinEventType::CHECK_IN);
+
+        $lastEvent = CheckinEvent::with('recordedBy')
+            ->where('camper_id', $c->id)
+            ->whereIn('event_type', ['check_in', 'check_out'])
+            ->latest('occurred_at')
+            ->first();
 
         return [
-            'camper_number'     => $c->camper_number,
-            'full_name'         => $c->full_name,
-            'gender'            => $c->gender?->value,
-            'category'          => $c->category?->label() ?? $c->category?->value,
-            'club_rank'         => $c->club_rank,
-            'church'            => $c->church?->name,
-            'district'          => $c->church?->district?->name,
-            'photo_url'         => $c->getFirstMedia('photo')
+            'camper_number'          => $c->camper_number,
+            'full_name'              => $c->full_name,
+            'gender'                 => $c->gender?->value,
+            'category'               => $c->category?->label() ?? $c->category?->value,
+            'club_rank'              => $c->club_rank,
+            'church'                 => $c->church?->name,
+            'district'               => $c->church?->district?->name,
+            'photo_url'              => $c->getFirstMedia('photo')
                 ? route('camper.photo', $c->id)
                 : null,
-            'is_checked_in'     => $isCheckedIn,
-            'requires_consent'  => $c->requiresConsentForm(),
-            'consent_required'  => $c->requiresConsentForm(),
-            'consent_collected' => (bool) $c->consent_collected,
+            'is_checked_in'          => $isCheckedIn,
+            'requires_consent'       => $c->requiresConsentForm(),
+            'consent_required'       => $c->requiresConsentForm(),
+            'consent_collected'      => (bool) $c->consent_collected,
+            'last_event_type'        => $lastEvent ? (is_string($lastEvent->event_type) ? $lastEvent->event_type : $lastEvent->event_type?->value) : null,
+            'last_event_at'          => $lastEvent?->occurred_at?->format('g:i A, d M Y'),
+            'last_event_by'          => $lastEvent?->recordedBy?->name,
         ];
     }
 }

@@ -160,44 +160,63 @@
                 <div class="grid grid-cols-2 gap-2 text-xs text-gray-300">
                     <div><span class="text-gray-500">Church:</span> <span x-text="result?.church ?? '—'"></span></div>
                     <div><span class="text-gray-500">District:</span> <span x-text="result?.district ?? '—'"></span></div>
+                    <div x-show="result?.last_event_type">
+                        <span class="text-gray-500">Last Event:</span>
+                        <span x-text="result?.last_event_type === 'check_in' ? '✅ Checked In' : '🚪 Checked Out'"></span>
+                    </div>
+                    <div x-show="result?.last_event_by">
+                        <span class="text-gray-500">By:</span>
+                        <span x-text="result?.last_event_by ?? '—'"></span>
+                    </div>
                 </div>
 
-                <div class="flex gap-2 pt-2">
-                    <!-- Check-in mode buttons -->
-                    <template x-if="mode === 'checkin'">
-                        <div class="flex gap-2 w-full">
-                            <button @click="checkIn(false)"
-                                    :disabled="result?.is_checked_in"
-                                    x-show="!result?.consent_required || result?.consent_collected"
-                                    class="flex-1 bg-green-600 font-bold py-3 rounded-xl text-sm hover:bg-green-500 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                                ✓ Check In
-                            </button>
-                            <button @click="checkIn(true)"
-                                    :disabled="result?.is_checked_in"
-                                    x-show="result?.consent_required && !result?.consent_collected"
-                                    class="flex-1 bg-green-600 font-bold py-3 rounded-xl text-sm hover:bg-green-500 transition disabled:opacity-40 disabled:cursor-not-allowed">
-                                ✓ Check In + Collect Consent
-                            </button>
-                            <button @click="doCheckOut()"
-                                    x-show="result?.is_checked_in"
-                                    class="bg-red-700 font-bold px-4 py-3 rounded-xl text-sm hover:bg-red-600 transition">
-                                🚪 Out
-                            </button>
-                        </div>
-                    </template>
-                    <!-- Attendance mode buttons -->
-                    <template x-if="mode === 'attendance'">
-                        <div class="flex gap-2 w-full">
-                            <button @click="markAttendance()"
-                                    :disabled="!selectedSessionId"
-                                    class="flex-1 bg-blue-600 font-bold py-3 rounded-xl text-sm hover:bg-blue-500 transition disabled:opacity-40">
-                                📋 Mark Present
-                            </button>
-                        </div>
-                    </template>
+                <!-- ── Action buttons ──────────────────────────────── -->
+                <div class="flex flex-col gap-3 pt-3" x-show="mode === 'checkin'">
+
+                    <!-- Check In + Collect Consent — only when consent needed & not yet collected & not checked in -->
+                    <button @click="checkIn(true)"
+                            x-show="result?.consent_required && !result?.consent_collected && !result?.is_checked_in"
+                            class="w-full font-bold py-4 rounded-2xl text-base transition"
+                            style="background:#D97706;color:#fff;border:none;font-size:1rem;padding:1rem 1.25rem;border-radius:1rem;cursor:pointer;letter-spacing:0.01em">
+                        📋 Check In + Collect Consent Form
+                    </button>
+
+                    <!-- Check In — always shown when not yet checked in -->
+                    <button @click="checkIn(false)"
+                            x-show="!result?.is_checked_in"
+                            class="w-full font-bold py-4 rounded-2xl text-base transition"
+                            style="background:#16A34A;color:#fff;border:none;font-size:1rem;padding:1rem 1.25rem;border-radius:1rem;cursor:pointer">
+                        ✅ Check In
+                    </button>
+
+                    <!-- Check Out — only when already checked in -->
+                    <button @click="doCheckOut()"
+                            x-show="result?.is_checked_in"
+                            class="w-full font-bold py-4 rounded-2xl text-base transition"
+                            style="background:#DC2626;color:#fff;border:none;font-size:1rem;padding:1rem 1.25rem;border-radius:1rem;cursor:pointer">
+                        🚪 Check Out
+                    </button>
+
+                    <!-- Reset — always visible -->
                     <button @click="reset()"
-                            class="bg-gray-700 font-bold px-4 py-3 rounded-xl text-sm hover:bg-gray-600 transition">
-                        Reset
+                            class="w-full font-bold py-3 rounded-2xl text-base transition"
+                            style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);font-size:0.95rem;padding:0.85rem 1.25rem;border-radius:1rem;cursor:pointer">
+                        ↩ Reset
+                    </button>
+                </div>
+
+                <!-- Attendance mode buttons -->
+                <div class="flex flex-col gap-3 pt-3" x-show="mode === 'attendance'">
+                    <button @click="markAttendance()"
+                            :disabled="!selectedSessionId"
+                            class="w-full font-bold py-4 rounded-2xl text-base"
+                            style="background:#2563EB;color:#fff;border:none;font-size:1rem;padding:1rem 1.25rem;border-radius:1rem;cursor:pointer">
+                        📋 Mark Present
+                    </button>
+                    <button @click="reset()"
+                            class="w-full font-bold py-3 rounded-2xl"
+                            style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);font-size:0.95rem;padding:0.85rem 1.25rem;border-radius:1rem;cursor:pointer">
+                        ↩ Reset
                     </button>
                 </div>
             </div>
