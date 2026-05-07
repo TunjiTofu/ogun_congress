@@ -534,10 +534,16 @@
             async loadSessions() {
                 if (!this.token) return;
                 try {
+                    // const res = await fetch('/api/checkin/sessions', {
+                    //     headers: { Authorization: `Bearer ${this.token}` }
+                    // });
+                    // if (res.ok) this.sessions = await res.json();
+
                     const res = await fetch('/api/checkin/sessions', {
-                        headers: { Authorization: `Bearer ${this.token}` }
+                        headers: apiHeaders(this.token),
                     });
                     if (res.ok) this.sessions = await res.json();
+                    else console.warn('loadSessions HTTP', res.status);
                 } catch(e) { console.error('loadSessions failed', e); }
             },
 
