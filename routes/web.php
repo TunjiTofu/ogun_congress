@@ -4,7 +4,9 @@ use App\Http\Controllers\BulkIdCardController;
 use App\Http\Controllers\CamperExportController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\RegistrationController;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 // ── Proof image server ────────────────────────────────────────────────────────
 Route::get('/proof-image/{path}', function (string $path) {
@@ -158,4 +160,89 @@ Route::middleware(['auth'])->prefix('exports')->name('exports.')->group(function
         ->name('id-cards');
     Route::get('campers', [CamperExportController::class, 'export'])
         ->name('campers');
+});
+
+// ── Admin artisan shortcuts (super_admin only) ────────────────────────────────
+Route::middleware(['auth'])->prefix('artisan')->name('artisan.')->group(function () {
+
+    // Shared terminal-style output helper
+    $terminal = function (string $command, string $result) {
+        $ok = ! str_contains($result, 'ERROR');
+        return response(
+            '<html><head><title>Artisan</title></head>'
+            . '<body style="margin:0;background:#1e1e1e;color:#d4d4d4;font-family:monospace;padding:2rem">'
+            . '<p style="color:#94A3B8;margin-bottom:0.5rem">$ <strong style="color:#4ade80">' . e($command) . '</strong></p>'
+            . '<pre style="white-space:pre-wrap;margin-top:1rem">' . e($result) . '</pre>'
+            . ($ok
+                ? '<p style="color:#4ade80;margin-top:1rem">✓ Done</p>'
+                : '<p style="color:#f87171;margin-top:1rem">✗ Error</p>')
+            . '</body></html>'
+        )->header('Content-Type', 'text/html');
+    };
+
+    // ── Migrate ───────────────────────────────────────────────────────────────
+    Route::get('migrate', function () use ($terminal) {
+        if (! auth()->user()->hasRole('super_admin')) abort(403);
+        try {
+            $out = new BufferedOutput();
+            Artisan::call('migrate', ['--force' => true], $out);
+            return $terminal('php artisan migrate --force', $out->fetch());
+        } catch (\Throwable $e) {
+            return $terminal('php artisan migrate --force', 'ERROR: ' . $e->getMessage());
+        }
+    })->name('migrate');
+
+    // ── Rollback (1 batch) ────────────────────────────────────────────────────
+    Route::get('migrate/rollback', function () use ($terminal) {
+        if (! auth()->user()->hasRole('super_admin')) abort(403);
+        $step = max(1, (int) request('step', 1));
+        try {
+            $out = new BufferedOutput();
+            Artisan::call('migrate:rollback', ['--force' => true, '--step' => $step], $out);
+            return $terminal("php artisan migrate:rollback --step={$step}", $out->fetch());
+        } catch (\Throwable $e) {
+            return $terminal("php artisan migrate:rollback --step={$step}", 'ERROR: ' . $e->getMessage());
+        }
+    })->name('migrate.rollback');
+
+    // ── Seed a specific class ─────────────────────────────────────────────────
+    // Usage: /artisan/seed?class=RolesAndPermissionsSeeder
+    Route::get('seed', function () use ($terminal) {
+        if (! auth()->user()->hasRole('super_admin')) abort(403);
+
+        // Whitelist allowed seeders — never allow arbitrary class execution
+        $allowed = [
+            'RolesAndPermissionsSeeder',
+            'DatabaseSeeder',
+            'DistrictSeeder',
+            'ChurchSeeder',
+        ];
+
+        $class = request('class', 'RolesAndPermissionsSeeder');
+
+        if (! in_array($class, $allowed)) {
+            return $terminal("php artisan db:seed --class={$class}", "ERROR: '{$class}' is not in the allowed seeders list.\n\nAllowed: " . implode(', ', $allowed));
+        }
+
+        try {
+            $out = new BufferedOutput();
+            Artisan::call('db:seed', ['--class' => $class, '--force' => true], $out);
+            return $terminal("php artisan db:seed --class={$class} --force", $out->fetch());
+        } catch (\Throwable $e) {
+            return $terminal("php artisan db:seed --class={$class}", 'ERROR: ' . $e->getMessage());
+        }
+    })->name('seed');
+
+    // ── Optimize clear ────────────────────────────────────────────────────────
+    Route::get('optimize-clear', function () use ($terminal) {
+        if (! auth()->user()->hasRole('super_admin')) abort(403);
+        try {
+            $out = new BufferedOutput();
+            Artisan::call('optimize:clear', [], $out);
+            return $terminal('php artisan optimize:clear', $out->fetch());
+        } catch (\Throwable $e) {
+            return $terminal('php artisan optimize:clear', 'ERROR: ' . $e->getMessage());
+        }
+    })->name('optimize.clear');
+
 });

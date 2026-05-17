@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Opcodes\LogViewer\Facades\LogViewer;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->configureRateLimiters();
+
+        LogViewer::auth(function ($request) {
+            return auth()->check() && auth()->user()->hasRole('super_admin');
+        });
     }
 
     private function configureRateLimiters(): void
