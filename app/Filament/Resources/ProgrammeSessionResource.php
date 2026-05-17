@@ -20,7 +20,7 @@ class ProgrammeSessionResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'secretariat']);
+        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'camp_director']);
     }
 
     public static function form(Form $form): Form

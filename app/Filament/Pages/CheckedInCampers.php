@@ -25,7 +25,7 @@ class CheckedInCampers extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'secretariat']);
+        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'camp_director']);
     }
 
     protected function getHeaderActions(): array
@@ -49,9 +49,20 @@ class CheckedInCampers extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        // Show ALL campers who have checked in today (whether currently in or out)
+        // Get IDs of campers who have ever checked in
         $checkedInIds = CheckinEvent::where('event_type', 'check_in')
             ->distinct('camper_id')
+            ->pluck('camper_id');
+
+        // Get currently-in IDs (last event = check_in)
+        $currentlyInIds = CheckinEvent::selectRaw('camper_id')
+            ->whereIn('id', function ($sub) {
+                $sub->selectRaw('MAX(id)')
+                    ->from('checkin_events')
+                    ->whereIn('event_type', ['check_in', 'check_out'])
+                    ->groupBy('camper_id');
+            })
+            ->where('event_type', 'check_in')
             ->pluck('camper_id');
 
         return $table
@@ -69,75 +80,67 @@ class CheckedInCampers extends Page implements HasTable
                         ? route('camper.photo', $record->id) : null),
 
                 Tables\Columns\TextColumn::make('camper_number')
-                    ->label('Code')
-                    ->fontFamily('mono')
-                    ->copyable()
-                    ->searchable(),
+                    ->label('Code')->fontFamily('mono')->copyable()->searchable(),
 
                 Tables\Columns\TextColumn::make('full_name')
-                    ->searchable()
-                    ->weight('bold')
-                    ->sortable(),
+                    ->searchable()->weight('bold')->sortable(),
 
                 Tables\Columns\TextColumn::make('category')
-                    ->badge()
-                    ->formatStateUsing(fn ($state) => $state?->label())
-                    ->sortable(),
+                    ->badge()->formatStateUsing(fn ($state) => $state?->label()),
 
                 Tables\Columns\TextColumn::make('church.name')
-                    ->label('Church')
-                    ->searchable()
-                    ->sortable(),
+                    ->label('Church')->searchable()->sortable(),
 
                 Tables\Columns\TextColumn::make('church.district.name')
-                    ->label('District')
-                    ->sortable(),
+                    ->label('District')->sortable(),
 
+                // Status — In / Out based on last event
                 Tables\Columns\TextColumn::make('checkin_status')
                     ->label('Status')
-                    ->getStateUsing(function ($record): HtmlString {
+                    ->getStateUsing(function ($record) use ($currentlyInIds): HtmlString {
+                        $isIn = $currentlyInIds->contains($record->id);
                         $last = CheckinEvent::where('camper_id', $record->id)
                             ->whereIn('event_type', ['check_in', 'check_out'])
                             ->latest('occurred_at')
                             ->first();
-
-                        if (! $last) {
+                        $time = $last ? Carbon::parse($last->occurred_at)->format('g:i A') : '';
+                        if ($isIn) {
                             return new HtmlString(
-                                '<span style="color:#94A3B8;font-size:0.78rem">—</span>'
+                                '<div><span style="background:#D1FAE5;color:#065F46;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:100px">✅ In Camp</span>'
+                                . '<div style="font-size:0.68rem;color:#64748B;margin-top:2px">' . $time . '</div></div>'
                             );
                         }
-
-                        $type  = is_string($last->event_type) ? $last->event_type : $last->event_type?->value;
-                        $isIn  = $type === 'check_in';
-                        $time  = Carbon::parse($last->occurred_at)->format('g:i A');
-                        $date  = Carbon::parse($last->occurred_at)->format('d M');
-                        $icon  = $isIn ? '✅' : '🚪';
-                        $label = $isIn ? 'Checked In' : 'Checked Out';
-                        $color = $isIn ? '#065F46' : '#991B1B';
-                        $bg    = $isIn ? '#D1FAE5' : '#FEE2E2';
-                        $bdr   = $isIn ? '#6EE7B7' : '#FCA5A5';
-
                         return new HtmlString(
-                            '<div style="display:flex;flex-direction:column;gap:2px">'
-                            . '<span style="display:inline-flex;align-items:center;gap:4px;'
-                            . 'background:' . $bg . ';color:' . $color . ';border:1px solid ' . $bdr . ';'
-                            . 'font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:100px;width:fit-content">'
-                            . $icon . ' ' . $label . '</span>'
-                            . '<span style="font-size:0.72rem;color:#64748B">' . $time . ', ' . $date . '</span>'
-                            . '</div>'
+                            '<div><span style="background:#FEE2E2;color:#991B1B;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:100px">🚪 Checked Out</span>'
+                            . '<div style="font-size:0.68rem;color:#64748B;margin-top:2px">' . $time . '</div></div>'
                         );
                     })
                     ->html(),
 
                 Tables\Columns\IconColumn::make('consent_collected')
-                    ->label('Consent')
-                    ->boolean()
-                    ->trueIcon('heroicon-o-check-circle')
-                    ->falseIcon('heroicon-o-x-circle')
-                    ->trueColor('success')
-                    ->falseColor('warning'),
+                    ->label('Consent')->boolean()->trueColor('success')->falseColor('warning'),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('Current Status')
+                    ->options(['in' => '✅ In Camp', 'out' => '🚪 Checked Out'])
+                    ->query(function ($query, array $data) use ($currentlyInIds) {
+                        if ($data['value'] === 'in') {
+                            return $query->whereIn('id', $currentlyInIds);
+                        }
+                        if ($data['value'] === 'out') {
+                            return $query->whereNotIn('id', $currentlyInIds);
+                        }
+                    }),
+
+                Tables\Filters\SelectFilter::make('category')
+                    ->options(\App\Enums\CamperCategory::class),
+
+                Tables\Filters\SelectFilter::make('church')
+                    ->relationship('church', 'name')->searchable(),
             ])
             ->actions([
+                // Trail modal — shows full check-in/out history for this camper
                 Tables\Actions\Action::make('trail')
                     ->label('Trail')
                     ->icon('heroicon-o-clock')
@@ -146,59 +149,37 @@ class CheckedInCampers extends Page implements HasTable
                     ->modalContent(function ($record): HtmlString {
                         $events = CheckinEvent::with('recordedBy')
                             ->where('camper_id', $record->id)
+                            ->whereIn('event_type', ['check_in', 'check_out'])
                             ->orderBy('occurred_at', 'desc')
                             ->get();
 
                         if ($events->isEmpty()) {
-                            return new HtmlString(
-                                '<p style="color:#94A3B8;font-style:italic;padding:1rem 0">No events recorded.</p>'
-                            );
+                            return new HtmlString('<p style="color:#94A3B8;font-style:italic;padding:1rem 0">No events recorded.</p>');
                         }
 
                         $rows = '';
                         foreach ($events as $e) {
                             $type  = is_string($e->event_type) ? $e->event_type : $e->event_type?->value;
                             $isIn  = $type === 'check_in';
-                            $isOut = $type === 'check_out';
-
-                            $icon  = $isIn ? '✅' : ($isOut ? '🚪' : '📋');
-                            $label = $isIn ? 'Check In' : ($isOut ? 'Check Out' : 'Programme Attendance');
-                            $color = $isIn ? '#065F46' : ($isOut ? '#991B1B' : '#1E40AF');
-                            $bg    = $isIn ? '#D1FAE5' : ($isOut ? '#FEE2E2' : '#DBEAFE');
-                            $bdr   = $isIn ? '#6EE7B7' : ($isOut ? '#FCA5A5' : '#BFDBFE');
+                            $icon  = $isIn ? '✅' : '🚪';
+                            $label = $isIn ? 'Check In' : 'Check Out';
+                            $color = $isIn ? '#065F46' : '#991B1B';
+                            $bg    = $isIn ? '#D1FAE5' : '#FEE2E2';
+                            $bdr   = $isIn ? '#6EE7B7' : '#FCA5A5';
                             $time  = Carbon::parse($e->occurred_at)->format('g:i A, d M Y');
                             $by    = $e->recordedBy?->name ?? 'Unknown';
-                            $dev   = $e->device_id
-                                ? '<span style="font-size:0.65rem;color:#94A3B8"> · ' . e($e->device_id) . '</span>'
-                                : '';
 
-                            $rows .= '<div style="display:flex;align-items:flex-start;gap:0.75rem;'
-                                . 'padding:0.75rem 0;border-bottom:1px solid #F1F5F9">'
-                                . '<span style="font-size:1.3rem;flex-shrink:0;margin-top:2px">' . $icon . '</span>'
-                                . '<div style="flex:1;min-width:0">'
-                                . '<span style="display:inline-block;background:' . $bg . ';color:' . $color . ';'
-                                . 'border:1px solid ' . $bdr . ';font-size:0.72rem;font-weight:700;'
-                                . 'padding:2px 10px;border-radius:100px">' . $label . '</span>'
-                                . $dev
-                                . '<div style="font-size:0.72rem;color:#64748B;margin-top:3px">'
-                                . '🕐 ' . $time . ' &nbsp;·&nbsp; 👤 ' . e($by)
-                                . '</div>'
-                                . '</div>'
-                                . '</div>';
+                            $rows .= '<div style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.75rem 0;border-bottom:1px solid #F1F5F9">'
+                                . '<span style="font-size:1.2rem;flex-shrink:0">' . $icon . '</span>'
+                                . '<div style="flex:1">'
+                                . '<span style="background:' . $bg . ';color:' . $color . ';border:1px solid ' . $bdr . ';font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:100px">' . $label . '</span>'
+                                . '<div style="font-size:0.72rem;color:#64748B;margin-top:3px">🕐 ' . $time . ' &nbsp;·&nbsp; 👤 ' . e($by) . '</div>'
+                                . '</div></div>';
                         }
-
-                        return new HtmlString('<div style="padding:0 0.25rem;max-height:60vh;overflow-y:auto">' . $rows . '</div>');
+                        return new HtmlString('<div style="max-height:60vh;overflow-y:auto;padding:0 0.25rem">' . $rows . '</div>');
                     })
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
-            ])
-            ->filters([
-                Tables\Filters\SelectFilter::make('category')
-                    ->options(\App\Enums\CamperCategory::class),
-
-                Tables\Filters\SelectFilter::make('church')
-                    ->relationship('church', 'name')
-                    ->searchable(),
             ])
             ->paginated([25, 50, 100])
             ->poll('30s');

@@ -35,4 +35,9 @@ class CheckinEvent extends Model
     {
         return $this->belongsTo(User::class, 'recorded_by');
     }
+
+    public function programmeSession(): BelongsTo
+    {
+        return $this->belongsTo(ProgrammeSession::class);
+    }
 }

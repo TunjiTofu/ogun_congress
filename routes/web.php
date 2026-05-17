@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\BulkIdCardController;
+use App\Http\Controllers\CamperExportController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\RegistrationController;
 use Illuminate\Support\Facades\Route;
@@ -149,4 +151,11 @@ Route::middleware(['auth'])->prefix('attendance')->name('attendance.')->group(fu
         ->name('export.all');
     Route::get('daily-checkins',          [App\Http\Controllers\AttendanceController::class, 'dailyCheckins'])
         ->name('daily.checkins');
+});
+
+Route::middleware(['auth'])->prefix('exports')->name('exports.')->group(function () {
+    Route::get('id-cards', [BulkIdCardController::class, 'export'])
+        ->name('id-cards');
+    Route::get('campers', [CamperExportController::class, 'export'])
+        ->name('campers');
 });

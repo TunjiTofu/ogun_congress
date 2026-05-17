@@ -20,6 +20,11 @@ class StatsOverviewWidget extends BaseWidget
     // Poll every 30 seconds for near-real-time updates
     protected static ?string $pollingInterval = '30s';
 
+    public static function canView(): bool
+    {
+        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'accountant', 'camp_director', 'district_coordinator']);
+    }
+
     protected function getStats(): array
     {
         $totalRegistered = Camper::count();

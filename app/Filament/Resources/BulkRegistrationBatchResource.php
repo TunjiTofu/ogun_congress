@@ -27,8 +27,12 @@ class BulkRegistrationBatchResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['church_coordinator', 'accountant', 'super_admin']);
+        return auth()->user()->hasAnyRole(['church_coordinator', 'accountant', 'super_admin', 'camp_director', 'district_coordinator']);
     }
+
+    public static function canCreate(): bool { return auth()->user()->hasRole('church_coordinator'); }
+    public static function canEdit($record): bool { return auth()->user()->hasAnyRole(['super_admin', 'church_coordinator']); }
+    public static function canDelete($record): bool { return auth()->user()->hasRole('super_admin'); }
 
     public static function form(Form $form): Form
     {
