@@ -130,7 +130,6 @@ class PaymentService
     {
         $secret   = config('services.paystack.webhook_secret');
         $expected = hash_hmac('sha512', $payload, $secret);
-
         return hash_equals($expected, $signature);
     }
 
