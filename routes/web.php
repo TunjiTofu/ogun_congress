@@ -212,7 +212,7 @@ Route::middleware(['auth'])->prefix('artisan')->name('artisan.')->group(function
 
         // Whitelist allowed seeders — never allow arbitrary class execution
         $allowed = [
-            'RolesAndPermissionsSeeder',
+            'RolesSeeder',
             'DatabaseSeeder',
             'DistrictSeeder',
             'ChurchSeeder',
