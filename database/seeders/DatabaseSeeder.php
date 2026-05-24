@@ -35,6 +35,7 @@ class DatabaseSeeder extends Seeder
             BadgeColorSeeder::class,
             ClubRankSeeder::class,
             AdminUserSeeder::class,
+            CampRoleSeeder::class,
         ]);
     }
 }
