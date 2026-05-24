@@ -34,6 +34,7 @@ class Camper extends Model implements HasMedia
             'gender'            => Gender::class,
             'category'          => CamperCategory::class,
             'consent_collected' => 'boolean',
+            'is_official' => 'boolean',
         ];
     }
 
@@ -92,6 +93,11 @@ class Camper extends Model implements HasMedia
     public function checkinEvents(): HasMany
     {
         return $this->hasMany(CheckinEvent::class);
+    }
+
+    public function campRole(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\CampRole::class);
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────

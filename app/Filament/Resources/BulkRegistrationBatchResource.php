@@ -27,12 +27,8 @@ class BulkRegistrationBatchResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['church_coordinator', 'accountant', 'super_admin', 'camp_director', 'district_coordinator']);
+        return auth()->user()->hasAnyRole(['church_coordinator', 'accountant', 'super_admin']);
     }
-
-    public static function canCreate(): bool { return auth()->user()->hasRole('church_coordinator'); }
-    public static function canEdit($record): bool { return auth()->user()->hasAnyRole(['super_admin', 'church_coordinator']); }
-    public static function canDelete($record): bool { return auth()->user()->hasRole('super_admin'); }
 
     public static function form(Form $form): Form
     {
@@ -72,7 +68,7 @@ class BulkRegistrationBatchResource extends Resource
                         ->required()
                         ->dehydrated(false)
                         ->hidden(fn () => auth()->user()->hasRole('church_coordinator'))
-                        ->disabled(fn ($record) => $record && ! $record->isDraft()),
+                        ->disabled(fn ($record) => $record && $record->status === 'confirmed'),
 
                     Forms\Components\Select::make('church_id')
                         ->label('Church')
@@ -81,7 +77,7 @@ class BulkRegistrationBatchResource extends Resource
                         ->required()
                         ->searchable()
                         ->hidden(fn () => auth()->user()->hasRole('church_coordinator'))
-                        ->disabled(fn ($record) => $record && ! $record->isDraft()),
+                        ->disabled(fn ($record) => $record && $record->status === 'confirmed'),
 
                     // Read-only church display for coordinators
                     Forms\Components\Placeholder::make('church_display')
@@ -97,7 +93,7 @@ class BulkRegistrationBatchResource extends Resource
                     Forms\Components\Textarea::make('notes')
                         ->rows(2)
                         ->columnSpanFull()
-                        ->disabled(fn ($record) => $record && ! $record->isDraft()),
+                        ->disabled(fn ($record) => $record && $record->status === 'confirmed'),
                 ])->columns(2),
 
             // Bank transfer details (filled when submitting for payment)
@@ -258,7 +254,7 @@ class BulkRegistrationBatchResource extends Resource
                                 $set('duplicate_warning', null);
                             }
                         })
-                        ->disabled(fn ($record) => $record && ! $record->isDraft())
+                        ->disabled(fn ($record) => $record && $record->status === 'confirmed')
                         ->minItems(1),
 
                     // Duplicate warning banner
@@ -355,8 +351,18 @@ class BulkRegistrationBatchResource extends Resource
                         && ! auth()->user()->hasRole('super_admin')),
 
                 Tables\Actions\EditAction::make()
-                    ->visible(fn () => ! auth()->user()->hasRole('accountant')
-                        || auth()->user()->hasRole('super_admin')),
+                    ->visible(fn ($record) => (! auth()->user()->hasRole('accountant')
+                            || auth()->user()->hasRole('super_admin'))
+                        && $record?->status !== 'confirmed'),
+
+                // Lock badge for confirmed batches
+                Tables\Actions\Action::make('confirmed_lock')
+                    ->label('Confirmed — Locked')
+                    ->icon('heroicon-o-lock-closed')
+                    ->color('success')
+                    ->disabled()
+                    ->visible(fn ($record) => $record?->status === 'confirmed'
+                        && ! auth()->user()->hasRole('accountant')),
 
                 // Pay online via Paystack
                 Tables\Actions\Action::make('pay_paystack')
@@ -371,8 +377,15 @@ class BulkRegistrationBatchResource extends Resource
                     )
                     ->visible(fn (BulkRegistrationBatch $r) => $r->isDraft() &&
                         auth()->user()->hasAnyRole(['church_coordinator', 'super_admin']) &&
-                        config('services.paystack.secret_key'))
+                        config('services.paystack.secret_key') &&
+                        setting('paystack_enabled', '1') === '1')
                     ->action(function (BulkRegistrationBatch $record, BulkRegistrationService $service) {
+                        if (setting('paystack_enabled', '1') !== '1') {
+                            Notification::make()
+                                ->title('Paystack is currently disabled.')
+                                ->danger()->send();
+                            return;
+                        }
                         try {
                             $result = $service->initiatePaystackPayment($record);
                             Notification::make()

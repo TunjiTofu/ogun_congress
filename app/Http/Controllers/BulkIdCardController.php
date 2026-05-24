@@ -14,7 +14,8 @@ class BulkIdCardController extends Controller
     private array $departmentColors = [
         'pathfinder'   => '#2D7A3A',  // Green
         'adventurer'   => '#1B3A8F',  // Navy Blue
-        'senior_youth' => '#C9A94D',  // Gold
+        'senior_youth' => '#875216',  // Gold
+//        'senior_youth' => '#C9A94D',  // Gold
     ];
 
     public function export(Request $request)
@@ -23,7 +24,7 @@ class BulkIdCardController extends Controller
             abort(403);
         }
 
-        $query = Camper::with(['media', 'church.district'])
+        $query = Camper::with(['media', 'church.district', 'campRole'])
             ->orderBy('church_id')
             ->orderBy('full_name');
 
@@ -48,11 +49,17 @@ class BulkIdCardController extends Controller
             $c->photo_base64 = $this->encodePhoto($c);
             $c->qr_base64    = $this->encodeQr($c);
 
-            // Compute badge color per department
-            $categoryValue   = $c->category?->value ?? 'senior_youth';
-            $c->badge_color_computed = $c->badge_color
-                ?? $this->departmentColors[$categoryValue]
-                ?? '#1B3A6B';
+            // Officials get wine (or role-specific) colour; others get department colour
+            if ($c->is_official && $c->campRole) {
+                $c->badge_color_computed = $c->campRole->color ?? '#722F37';
+                $c->official_role_label  = strtoupper($c->campRole->name);
+            } else {
+                $categoryValue           = $c->category?->value ?? 'senior_youth';
+                $c->badge_color_computed = $c->badge_color
+                    ?? $this->departmentColors[$categoryValue]
+                    ?? '#1B3A6B';
+                $c->official_role_label  = null;
+            }
         });
 
         // 2 columns × 3 rows = 6 cards per A4 page

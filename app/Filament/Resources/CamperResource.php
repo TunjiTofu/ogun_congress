@@ -135,25 +135,39 @@ class CamperResource extends Resource
                         ->getStateUsing(function (Camper $record): string {
                             $contacts = $record->contacts;
                             if (! $contacts || $contacts->isEmpty()) {
-                                return '<p style="color:#94A3B8;font-style:italic">No contacts recorded.</p>';
+                                return '<p style="color:var(--fi-color-gray-400,#94A3B8);font-style:italic">No contacts recorded.</p>';
                             }
-                            $html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">';
+                            // Use CSS classes that work in both light & dark mode
+                            $html = '<style>
+                                .contact-grid { display:grid;grid-template-columns:1fr 1fr;gap:0.75rem }
+                                .contact-card { border:1px solid var(--fi-color-gray-200,#e2e8f0);border-radius:10px;padding:0.85rem 1rem }
+                                .contact-badge { font-size:0.68rem;font-weight:700;padding:0.2rem 0.65rem;border-radius:100px;display:inline-block;margin-bottom:0.6rem }
+                                .contact-badge-parent { background:color-mix(in srgb,#3730a3 15%,transparent);color:#3730a3 }
+                                .contact-badge-emergency { background:color-mix(in srgb,#dc2626 15%,transparent);color:#dc2626 }
+                                .contact-row { font-size:0.82rem;margin-bottom:3px }
+                                .contact-lbl { font-size:0.7rem;opacity:0.6 }
+                                @media(prefers-color-scheme:dark) {
+                                    .contact-badge-parent { background:rgba(99,102,241,0.2);color:#a5b4fc }
+                                    .contact-badge-emergency { background:rgba(239,68,68,0.2);color:#fca5a5 }
+                                    .contact-card { border-color:rgba(255,255,255,0.1) }
+                                }
+                                .dark .contact-badge-parent { background:rgba(99,102,241,0.2);color:#a5b4fc }
+                                .dark .contact-badge-emergency { background:rgba(239,68,68,0.2);color:#fca5a5 }
+                                .dark .contact-card { border-color:rgba(255,255,255,0.1) }
+                            </style>';
+                            $html .= '<div class="contact-grid">';
                             foreach ($contacts as $c) {
-                                $type  = is_string($c->type) ? $c->type : ($c->type?->value ?? '');
-                                $isP   = $type === 'parent_guardian';
-                                $label = $isP ? '👨‍👩‍👧 Parent / Guardian' : '🆘 Emergency Contact';
-                                $bg    = $isP ? '#EEF2FF' : '#FEF2F2';
-                                $bc    = $isP ? '#C7D2FE' : '#FCA5A5';
-                                $tc    = $isP ? '#3730A3' : '#991B1B';
-                                $html .= '<div style="border:1px solid '.$bc.';border-radius:10px;padding:0.85rem 1rem">';
-                                $html .= '<span style="background:'.$bg.';color:'.$tc.';font-size:0.68rem;font-weight:700;'
-                                    . 'padding:0.2rem 0.65rem;border-radius:100px;display:inline-block;margin-bottom:0.6rem">'
-                                    . $label . '</span>';
-                                $html .= '<div style="font-size:0.82rem;display:grid;gap:0.3rem">';
-                                $html .= '<div><span style="color:#94A3B8;font-size:0.7rem">Name: </span><strong>' . e($c->full_name ?? '—') . '</strong></div>';
-                                if ($c->relationship) $html .= '<div><span style="color:#94A3B8;font-size:0.7rem">Relationship: </span>' . e($c->relationship) . '</div>';
-                                if ($c->phone) $html       .= '<div><span style="color:#94A3B8;font-size:0.7rem">Phone: </span>' . e($c->phone) . '</div>';
-                                if ($c->email) $html       .= '<div><span style="color:#94A3B8;font-size:0.7rem">Email: </span>' . e($c->email) . '</div>';
+                                $type    = is_string($c->type) ? $c->type : ($c->type?->value ?? '');
+                                $isP     = $type === 'parent_guardian';
+                                $label   = $isP ? '👨‍👩‍👧 Parent / Guardian' : '🆘 Emergency Contact';
+                                $badgeCls = $isP ? 'contact-badge-parent' : 'contact-badge-emergency';
+                                $html .= '<div class="contact-card">';
+                                $html .= '<span class="contact-badge ' . $badgeCls . '">' . $label . '</span>';
+                                $html .= '<div>';
+                                $html .= '<div class="contact-row"><span class="contact-lbl">Name </span><strong>' . e($c->full_name ?? '—') . '</strong></div>';
+                                if ($c->relationship) $html .= '<div class="contact-row"><span class="contact-lbl">Relationship </span>' . e($c->relationship) . '</div>';
+                                if ($c->phone)        $html .= '<div class="contact-row"><span class="contact-lbl">Phone </span>' . e($c->phone) . '</div>';
+                                if ($c->email)        $html .= '<div class="contact-row"><span class="contact-lbl">Email </span>' . e($c->email) . '</div>';
                                 $html .= '</div></div>';
                             }
                             $html .= '</div>';
@@ -249,15 +263,23 @@ class CamperResource extends Resource
                                 . 'style="width:100px;height:125px;border-radius:10px;object-fit:cover;'
                                 . 'object-position:top center;border:2px solid #E2E8F0">');
                         }),
-                    Forms\Components\TextInput::make('full_name')->disabled()
-                        ->helperText('Set from payment record.'),
-                    Forms\Components\TextInput::make('phone')->disabled()
-                        ->helperText('Set from payment record.'),
-                    Forms\Components\TextInput::make('camper_number')->disabled(),
+                    // Super admin can edit name & phone; others see read-only
+                    Forms\Components\TextInput::make('full_name')
+                        ->disabled(fn () => ! auth()->user()->hasRole('super_admin'))
+                        ->helperText(fn () => auth()->user()->hasRole('super_admin')
+                            ? 'Editable by super admin only.'
+                            : 'Set from payment record.'),
+                    Forms\Components\TextInput::make('phone')
+                        ->disabled(fn () => ! auth()->user()->hasRole('super_admin'))
+                        ->helperText(fn () => auth()->user()->hasRole('super_admin')
+                            ? 'Editable by super admin only.'
+                            : 'Set from payment record.'),
+                    Forms\Components\TextInput::make('camper_number')
+                        ->disabled(),
                     Forms\Components\Select::make('category')
                         ->options(collect(CamperCategory::cases())
                             ->mapWithKeys(fn ($e) => [$e->value => $e->label()])->toArray())
-                        ->disabled(),
+                        ->disabled(fn () => ! auth()->user()->hasRole('super_admin')),
                 ]),
 
             Forms\Components\Section::make('Personal Details')
@@ -286,6 +308,18 @@ class CamperResource extends Resource
                     Forms\Components\TextInput::make('ministry')->maxLength(100),
                     Forms\Components\TextInput::make('club_rank')->label('Club Rank')->maxLength(100),
                 ]),
+
+            Forms\Components\Section::make('Additional Info')
+                ->visibleOn('edit')
+                ->visible(fn () => auth()->user()->hasRole('super_admin'))
+                ->schema([
+                    Forms\Components\TextInput::make('volunteer_role')
+                        ->label('Volunteer Role')->maxLength(100)
+                        ->placeholder('e.g. Song Leader, Sabbath School Teacher'),
+                    Forms\Components\TextInput::make('badge_color')
+                        ->label('Custom Badge Colour (hex)')->placeholder('#1B3A8F')
+                        ->helperText('Overrides department colour on ID card. Leave blank for default.'),
+                ])->columns(2),
 
             Forms\Components\Section::make('Consent')
                 ->visibleOn('edit')
@@ -341,6 +375,13 @@ class CamperResource extends Resource
                 Tables\Columns\BadgeColumn::make('photo_status')
                     ->label('Photo')
                     ->colors(['warning' => 'pending', 'success' => 'approved', 'danger' => 'rejected'])
+                    ->visible($isSuperAdmin),
+
+                Tables\Columns\TextColumn::make('campRole.name')
+                    ->label('Official Role')
+                    ->badge()
+                    ->color('danger')
+                    ->placeholder('—')
                     ->visible($isSuperAdmin),
 
                 Tables\Columns\IconColumn::make('consent_collected')
@@ -481,6 +522,48 @@ class CamperResource extends Resource
                         Notification::make()->title('Queued.')->success()->send();
                     }),
 
+                // Mark as official
+                Tables\Actions\Action::make('mark_official')
+                    ->label('Mark as Official')
+                    ->icon('heroicon-o-shield-check')
+                    ->color('warning')
+                    ->visible(fn (Camper $r) => $isSuperAdmin && ! $r->is_official)
+                    ->form([
+                        \Filament\Forms\Components\Select::make('camp_role_id')
+                            ->label('Official Role')
+                            ->options(\App\Models\CampRole::where('is_active', true)
+                                ->orderBy('sort_order')->pluck('name', 'id'))
+                            ->required()
+                            ->searchable()
+                            ->helperText("The ID card will use the role's colour and display the role name."),
+                    ])
+                    ->action(function (Camper $record, array $data) {
+                        $record->update([
+                            'is_official'   => true,
+                            'camp_role_id'  => $data['camp_role_id'],
+                        ]);
+                        // Regenerate ID card with official design
+                        \App\Jobs\GenerateCamperDocumentsJob::dispatch($record->id);
+                        Notification::make()->title('Marked as official. ID card will regenerate.')->success()->send();
+                    }),
+
+                // Remove official status
+                Tables\Actions\Action::make('unmark_official')
+                    ->label('Remove Official Status')
+                    ->icon('heroicon-o-shield-exclamation')
+                    ->color('gray')
+                    ->visible(fn (Camper $r) => $isSuperAdmin && $r->is_official)
+                    ->requiresConfirmation()
+                    ->modalDescription("This will restore the camper's regular department ID card.")
+                    ->action(function (Camper $record) {
+        $record->update([
+            'is_official'  => false,
+            'camp_role_id' => null,
+        ]);
+        \App\Jobs\GenerateCamperDocumentsJob::dispatch($record->id);
+        Notification::make()->title('Official status removed. ID card will regenerate.')->success()->send();
+    }),
+
                 Tables\Actions\Action::make('approve_photo')
                     ->label('Approve Photo')->icon('heroicon-o-check-circle')->color('success')
                     ->visible(fn (Camper $r) => $isSuperAdmin
@@ -520,33 +603,33 @@ class CamperResource extends Resource
                     }),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('bulk_approve')
-                        ->label('Approve Photos')->icon('heroicon-o-check-circle')->color('success')
-                        ->visible($isSuperAdmin)
-                        ->action(function ($records) {
-                            $records->each(function ($r) {
-                                $r->update(['photo_status' => 'approved']);
-                                \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id);
-                            });
-                            Notification::make()->title('Photos approved.')->success()->send();
-                        }),
-                    Tables\Actions\BulkAction::make('bulk_regenerate')
-                        ->label('Regenerate Documents')
-                        ->icon('heroicon-o-arrow-path')
-                        ->color('gray')
-                        ->visible($isSuperAdmin)
-                        ->requiresConfirmation()
-                        ->modalDescription('This will queue document regeneration for all selected campers.')
-                        ->action(function ($records) {
-                            $records->each(fn ($r) => \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id));
-                            Notification::make()
-                                ->title($records->count() . ' campers queued for regeneration.')
-                                ->success()->send();
-                        }),
-                    Tables\Actions\DeleteBulkAction::make()->visible($isSuperAdmin),
-                ]),
-            ]);
+        Tables\Actions\BulkActionGroup::make([
+            Tables\Actions\BulkAction::make('bulk_approve')
+                ->label('Approve Photos')->icon('heroicon-o-check-circle')->color('success')
+                ->visible($isSuperAdmin)
+                ->action(function ($records) {
+                    $records->each(function ($r) {
+                        $r->update(['photo_status' => 'approved']);
+                        \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id);
+                    });
+                    Notification::make()->title('Photos approved.')->success()->send();
+                }),
+            Tables\Actions\BulkAction::make('bulk_regenerate')
+                ->label('Regenerate Documents')
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->visible($isSuperAdmin)
+                ->requiresConfirmation()
+                ->modalDescription('This will queue document regeneration for all selected campers.')
+                ->action(function ($records) {
+                    $records->each(fn ($r) => \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id));
+                    Notification::make()
+                        ->title($records->count() . ' campers queued for regeneration.')
+                        ->success()->send();
+                }),
+            Tables\Actions\DeleteBulkAction::make()->visible($isSuperAdmin),
+        ]),
+    ]);
     }
 
     public static function getRelationManagers(): array

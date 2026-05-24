@@ -2,11 +2,15 @@
 
 namespace App\Filament\Resources\CamperResource\Pages;
 
-use App\Enums\CamperCategory;
 use App\Filament\Resources\CamperResource;
+use App\Models\Camper;
+use App\Models\Church;
+use App\Models\District;
+use App\Enums\CamperCategory;
+use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Filament\Resources\Pages\ListRecords\Tab;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 
 class ListCampers extends ListRecords
 {
@@ -14,25 +18,45 @@ class ListCampers extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return []; // Campers are created via registration only
+        return [];
     }
 
-    public function getTabs(): array
+    /**
+     * Custom view — shows card grid on mobile, table on desktop.
+     * Filament renders this via getView().
+     */
+    public function getView(): string
     {
-        return [
-            'all' => Tab::make('All'),
+        return 'filament.pages.campers-list';
+    }
 
-            'adventurers' => Tab::make('Adventurers')
-                ->modifyQueryUsing(fn ($query) => $query->where('category', CamperCategory::ADVENTURER))
-                ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::ADVENTURER)->count()),
+    public function getViewData(): array
+    {
+        $user         = auth()->user();
+        $isSuperAdmin = $user->hasRole('super_admin');
 
-            'pathfinders' => Tab::make('Pathfinders')
-                ->modifyQueryUsing(fn ($query) => $query->where('category', CamperCategory::PATHFINDER))
-                ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::PATHFINDER)->count()),
+        // Apply simple filters from query string
+        $query = Camper::with(['church.district', 'media', 'campRole'])
+            ->orderBy('created_at', 'desc');
 
-            'senior_youth' => Tab::make('Senior Youth')
-                ->modifyQueryUsing(fn ($query) => $query->where('category', CamperCategory::SENIOR_YOUTH))
-                ->badge(fn () => \App\Models\Camper::where('category', CamperCategory::SENIOR_YOUTH)->count()),
-        ];
+        if (request('filter_category'))   $query->where('category', request('filter_category'));
+        if (request('filter_church'))     $query->where('church_id', request('filter_church'));
+        if (request('filter_district'))   $query->whereHas('church', fn ($q) => $q->where('district_id', request('filter_district')));
+        if (request('filter_photo'))      $query->where('photo_status', request('filter_photo'));
+        if (request('q')) {
+            $q = request('q');
+            $query->where(fn ($b) => $b->where('full_name', 'like', "%{$q}%")
+                ->orWhere('camper_number', 'like', "%{$q}%")
+                ->orWhere('phone', 'like', "%{$q}%"));
+        }
+
+        $perPage = in_array((int) request('per_page', 24), [12, 24, 48, 100])
+            ? (int) request('per_page', 24) : 24;
+        $campers = $query->paginate($perPage);
+        $districts = District::orderBy('name')->get();
+        $churches  = Church::orderBy('name')->get();
+
+        $baseUrl   = route('filament.admin.resources.campers.index');
+        return compact('campers', 'districts', 'churches', 'isSuperAdmin', 'baseUrl');
     }
 }

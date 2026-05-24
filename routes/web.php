@@ -54,7 +54,8 @@ Route::get('/storage/{path}', function (string $path) {
 Route::get('/verify/{camper_number}', function (string $camper_number) {
     // Check Filament/admin session (not the default web guard)
     if (! auth()->check()) {
-        return redirect(route('filament.admin.auth.login') . '?next=' . urlencode(request()->url()));
+        return redirect('/admin/login?next=' . urlencode(request()->url()));
+//        return redirect(route('filament.admin.auth.login') . '?next=' . urlencode(request()->url()));
     }
 
     if (! auth()->user()->hasAnyRole(['secretariat', 'security', 'super_admin'])) {
