@@ -18,8 +18,7 @@ class DocumentGenerationService
         $departmentColors = [
             'pathfinder'   => '#2D7A3A',  // Green
             'adventurer'   => '#1B3A8F',  // Navy Blue
-            'senior_youth' => '#875216',  // Gold
-//            'senior_youth' => '#C9A94D',  // Gold
+            'senior_youth' => '#C9A94D',  // Gold
         ];
         $categoryValue = $camper->category?->value ?? 'senior_youth';
         $badgeColor    = $camper->badge_color
@@ -29,6 +28,17 @@ class DocumentGenerationService
         $qrCode      = $this->generateQrCode($camper->camper_number, $camper->id);
         $photoBase64 = $this->encodePhotoBase64($camper);
         $logoBase64  = $this->encodeLogoBase64();
+
+        // Official role name — null for regular campers, role name for officials
+        $camper->loadMissing('campRole');
+        $officialRole = $camper->is_official && $camper->campRole
+            ? $camper->campRole->name
+            : null;
+
+        // Override badge color for officials (use role color)
+        if ($camper->is_official && $camper->campRole?->color) {
+            $badgeColor = $camper->campRole->color;
+        }
 
         // CR80 standard card: 54mm wide x 85.6mm tall (portrait)
         // In points (1mm = 2.8346pt): 153.07 x 242.57
