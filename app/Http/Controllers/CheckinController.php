@@ -34,7 +34,7 @@ class CheckinController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid credentials.'], 401);
         }
 
-        if (! $user->hasAnyRole(['secretariat', 'security', 'super_admin'])) {
+        if (! $user->hasAnyRole(['secretariat', 'security', 'camp_director', 'super_admin'])) {
             Log::warning('checkin.auth.unauthorized', [
                 'email' => $request->email,
                 'roles' => $user->getRoleNames(),
