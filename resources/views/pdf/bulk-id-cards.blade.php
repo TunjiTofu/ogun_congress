@@ -45,7 +45,10 @@
         .camper-name { font-size: 7pt; font-weight: bold; line-height: 1.2; word-break: break-word; margin-bottom: 0.8mm; }
         .camper-code { font-family: DejaVu Sans Mono; font-size: 4.5pt; color: #6B7280; margin-bottom: 1.5mm; }
         .dept-badge { color: #fff; font-size: 4.5pt; font-weight: bold; padding: 0.4mm 1.5mm; display: inline-block; border-radius: 0.5mm; }
-        .rank-txt { font-size: 3.8pt; color: #6B7280; margin-top: 0.5mm; }
+        .dept-line { font-size: 4.5pt; font-weight: bold; margin-bottom: 1mm; line-height: 1.4; }
+        .dept-badge { color: #fff; padding: 0.3mm 1.2mm; border-radius: 0.5mm; display: inline; }
+        .rank-sep { color: #6B7280; font-weight: normal; }
+        .role-line { font-weight:900;text-transform:uppercase;letter-spacing:0.8pt;margin-top:1.5mm;display:inline-block;padding:0.7mm 1.8mm;border-radius:1mm;color:#fff;font-size:5.5pt;word-break:break-word; }
 
         /* Details */
         .details-table { width: 49mm; margin: 1.5mm 3mm 0; border-collapse: collapse; border-top: 0.3pt solid #E5E7EB; }
@@ -81,13 +84,14 @@
                 @foreach($row as $camper)
                     <div class="col">
                         @include('pdf.partials.id-card-item', [
-                            'camper'      => $camper,
-                            'logoBase64'  => $logoBase64,
-                            'badgeColor'  => $camper->badge_color_computed,
-                            'campName'    => $campName,
-                            'campYear'    => $campYear,
-                            'photoBase64' => $camper->photo_base64,
-                            'qrCode'      => $camper->qr_base64,
+                            'camper'       => $camper,
+                            'logoBase64'   => $logoBase64,
+                            'badgeColor'   => $camper->badge_color_computed,
+                            'officialRole' => $camper->official_role_label,
+                            'campName'     => $campName,
+                            'campYear'     => $campYear,
+                            'photoBase64'  => $camper->photo_base64,
+                            'qrCode'       => $camper->qr_base64,
                         ])
                     </div>
                 @endforeach

@@ -11,7 +11,7 @@ class Church extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['district_id', 'name', 'address'];
+    protected $fillable = ['id', 'district_id', 'name', 'address'];
 
     // ── Relationships ─────────────────────────────────────────────────────────
 

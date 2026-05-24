@@ -18,7 +18,8 @@ class DocumentGenerationService
         $departmentColors = [
             'pathfinder'   => '#2D7A3A',  // Green
             'adventurer'   => '#1B3A8F',  // Navy Blue
-            'senior_youth' => '#C9A94D',  // Gold
+            'senior_youth' => '#875216',  // Gold
+//            'senior_youth' => '#C9A94D',  // Gold
         ];
         $categoryValue = $camper->category?->value ?? 'senior_youth';
         $badgeColor    = $camper->badge_color
@@ -32,13 +33,14 @@ class DocumentGenerationService
         // CR80 standard card: 54mm wide x 85.6mm tall (portrait)
         // In points (1mm = 2.8346pt): 153.07 x 242.57
         $pdf = Pdf::loadView('pdf.id-card', [
-            'camper'      => $camper,
-            'qrCode'      => $qrCode,
-            'photoBase64' => $photoBase64,
-            'logoBase64'  => $logoBase64,
-            'badgeColor'  => $badgeColor,
-            'campName'    => setting('camp_name', 'Ogun Youth Camp'),
-            'campYear'    => now()->year,
+            'camper'       => $camper,
+            'qrCode'       => $qrCode,
+            'photoBase64'  => $photoBase64,
+            'logoBase64'   => $logoBase64,
+            'badgeColor'   => $badgeColor,
+            'officialRole' => $officialRole,
+            'campName'     => setting('camp_name', 'Ogun Youth Camp'),
+            'campYear'     => now()->year,
         ])->setPaper([0, 0, 153.07, 242.57], 'portrait')
             ->setOptions(['dpi' => 150, 'isHtml5ParserEnabled' => true, 'isRemoteEnabled' => false]);
 

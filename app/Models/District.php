@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class District extends Model
 {
-    protected $fillable = ['name', 'zone'];
+    protected $fillable = ['id', 'name', 'zone'];
 
     public function churches(): HasMany
     {

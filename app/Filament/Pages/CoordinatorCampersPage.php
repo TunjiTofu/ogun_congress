@@ -335,16 +335,32 @@ class CoordinatorCampersPage extends Page implements HasTable
         $record->loadMissing(['church.district', 'contacts', 'health', 'registrationCode', 'media']);
         $photoUrl = $record->getFirstMedia('photo') ? route('camper.photo', $record->id) : null;
 
-        $html = '<div style="font-family:inherit">';
+        // CSS vars compatible with Filament dark/light mode
+        $html = '<style>
+            .cd-wrap { font-family:inherit }
+            .cd-label { font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.4rem;color:var(--fi-color-gray-500,#6b7280) }
+            .cd-row { display:grid;grid-template-columns:130px 1fr;padding:0.35rem 0;border-bottom:1px solid var(--fi-color-gray-200,#e5e7eb);font-size:0.82rem }
+            .cd-key { color:var(--fi-color-gray-400,#9ca3af) }
+            .cd-val { font-weight:600;color:var(--fi-color-gray-900,#111827) }
+            .cd-contact { border:1px solid var(--fi-color-gray-200,#e5e7eb);border-radius:10px;padding:0.85rem 1rem;margin-bottom:0.5rem }
+            .cd-badge { font-size:0.65rem;font-weight:700;padding:0.15rem 0.6rem;border-radius:100px;display:inline-block;margin-bottom:0.4rem }
+            .cd-badge-p { background:rgba(99,102,241,0.12);color:#4f46e5 }
+            .cd-badge-e { background:rgba(239,68,68,0.12);color:#dc2626 }
+            html.dark .cd-badge-p { background:rgba(165,180,252,0.15);color:#a5b4fc }
+            html.dark .cd-badge-e { background:rgba(252,165,165,0.15);color:#fca5a5 }
+            html.dark .cd-val { color:var(--fi-color-gray-100,#f3f4f6) }
+            html.dark .cd-row { border-bottom-color:var(--fi-color-gray-700,#374151) }
+        </style>';
+        $html .= '<div class="cd-wrap">';
 
         // Photo + identity header
         $html .= '<div style="display:flex;gap:1.25rem;align-items:flex-start;margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid #F1F5F9">';
         $html .= $photoUrl
             ? '<img src="' . e($photoUrl) . '" style="width:90px;height:112px;object-fit:cover;object-position:top center;border-radius:10px;border:2px solid #E2E8F0;flex-shrink:0">'
-            : '<div style="width:90px;height:112px;background:#F1F5F9;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#CBD5E1;flex-shrink:0">👤</div>';
+            : '<div style="width:90px;height:112px;background:var(--fi-color-gray-100,#f1f5f9);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:var(--fi-color-gray-300,#cbd5e1);flex-shrink:0">👤</div>';
         $html .= '<div style="flex:1">';
-        $html .= '<h2 style="font-size:1.1rem;font-weight:800;color:#0B2455;margin:0 0 0.25rem">' . e($record->full_name) . '</h2>';
-        $html .= '<p style="font-family:monospace;font-size:0.78rem;color:#64748B;margin:0 0 0.4rem">' . e($record->camper_number) . '</p>';
+        $html .= '<h2 style="font-size:1.1rem;font-weight:800;color:var(--fi-color-primary-600,#0B2455);margin:0 0 0.25rem">' . e($record->full_name) . '</h2>';
+        $html .= '<p style="font-family:monospace;font-size:0.78rem;color:var(--fi-color-gray-500,#64748b);margin:0 0 0.4rem">' . e($record->camper_number) . '</p>';
         $html .= '<span style="background:#0B2455;color:#fff;font-size:0.65rem;font-weight:700;padding:0.2rem 0.7rem;border-radius:100px">' . e($record->category?->label() ?? '—') . '</span>';
         if ($record->club_rank) {
             $html .= ' <span style="background:#F1F5F9;color:#475569;font-size:0.65rem;font-weight:600;padding:0.2rem 0.7rem;border-radius:100px">' . e($record->club_rank) . '</span>';
@@ -355,12 +371,12 @@ class CoordinatorCampersPage extends Page implements HasTable
         $html .= '</div></div>';
 
         $section = fn (string $title, string $body) =>
-            '<div style="margin-bottom:1rem"><p style="font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:#94A3B8;margin:0 0 0.4rem">' . $title . '</p>' . $body . '</div>';
+            '<div style="margin-bottom:1rem"><p class="cd-label">' . $title . '</p>' . $body . '</div>';
 
         $row = fn (string $lbl, string $val) =>
             '<div style="display:grid;grid-template-columns:130px 1fr;padding:0.35rem 0;border-bottom:1px solid #F8FAFC;font-size:0.82rem">'
-            . '<span style="color:#94A3B8">' . $lbl . '</span>'
-            . '<span style="font-weight:600;color:#1C2340">' . $val . '</span></div>';
+            . '<span class="cd-key">' . $lbl . '</span>'
+            . '<span class="cd-val">' . $val . '</span></div>';
 
         // Personal
         $personal  = $row('Gender', ucfirst($record->gender?->value ?? '—'));
@@ -399,10 +415,10 @@ class CoordinatorCampersPage extends Page implements HasTable
                 $cHtml .= '<div style="border:1px solid ' . $bc . ';border-radius:8px;padding:0.65rem 0.85rem">';
                 $cHtml .= '<span style="font-size:0.65rem;font-weight:700;background:' . $bg . ';color:' . ($isP ? '#3730A3' : '#991B1B') . ';padding:0.15rem 0.6rem;border-radius:100px;display:inline-block;margin-bottom:0.4rem">' . $lbl . '</span>';
                 $cHtml .= '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.3rem 1rem;font-size:0.78rem">';
-                $cHtml .= '<div><span style="color:#94A3B8;font-size:0.65rem;display:block">Name</span><strong>' . e($c->full_name) . '</strong></div>';
-                if ($c->relationship) $cHtml .= '<div><span style="color:#94A3B8;font-size:0.65rem;display:block">Relationship</span>' . e($c->relationship) . '</div>';
-                if ($c->phone) $cHtml .= '<div><span style="color:#94A3B8;font-size:0.65rem;display:block">Phone</span>' . e($c->phone) . '</div>';
-                if ($c->email) $cHtml .= '<div><span style="color:#94A3B8;font-size:0.65rem;display:block">Email</span>' . e($c->email) . '</div>';
+                $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Name</span><strong>' . e($c->full_name) . '</strong></div>';
+                if ($c->relationship) $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Relationship</span>' . e($c->relationship) . '</div>';
+                if ($c->phone) $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Phone</span>' . e($c->phone) . '</div>';
+                if ($c->email) $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Email</span>' . e($c->email) . '</div>';
                 $cHtml .= '</div></div>';
             }
             $cHtml .= '</div>';

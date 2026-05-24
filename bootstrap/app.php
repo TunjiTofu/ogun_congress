@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceCampOver;
 use App\Http\Middleware\ExtractBearerToken;
 use App\Http\Middleware\SetAppTimezone;
 use Illuminate\Auth\AuthenticationException;
@@ -39,6 +40,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
+
+        // Force-logout non-super_admin when camp is over
+        $middleware->appendToGroup('web', EnforceCampOver::class);
+
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // When an unauthenticated request hits an API endpoint,
@@ -51,8 +56,10 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             // Web requests → Filament login
-            return redirect()->route('filament.admin.auth.login');
+//            return redirect()->route('filament.admin.auth.login');
+            return redirect('/admin/login');
         });
+
     })
     ->withProviders([
         App\Providers\AppServiceProvider::class,

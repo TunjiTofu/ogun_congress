@@ -59,8 +59,25 @@ class RegistrationController extends Controller
 
     // ── Web routes ────────────────────────────────────────────────────────────
 
+    private function registrationIsOpen(): bool
+    {
+        // Check toggle
+        if (setting('registration_open', '1') !== '1') {
+            return false;
+        }
+        // Check closing date
+        $closesAt = setting('registration_closes_at');
+        if ($closesAt && now()->gt(\Illuminate\Support\Carbon::parse($closesAt))) {
+            return false;
+        }
+        return true;
+    }
+
     public function validateCodeWeb(Request $request)
     {
+        if (! $this->registrationIsOpen()) {
+            return back()->with('error', 'Registration is currently closed. Please contact your church coordinator for more information.');
+        }
         $request->validate(['code' => ['required', 'string']]);
         try {
             $this->registrationService->validateCode($request->input('code'));
