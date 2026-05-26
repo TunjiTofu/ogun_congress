@@ -788,14 +788,20 @@
 <body>
 
 @php
-    $appUrl = rtrim(config('app.url'), '/');
-    $parts = parse_url($appUrl);
+    $baseUrl = rtrim(config('app.url'), '/');
 
-    $scheme = $parts['scheme'] ?? 'http';
-    $host   = $parts['host'] ?? $appUrl;
-    $port   = $parts['port'] ?? env('APP_PORT');
+    if (app()->environment('local')) {
+        $port = env('APP_PORT');
 
-    $baseUrl = $scheme . '://' . $host . ($port ? ':' . $port : '');
+        if ($port) {
+            $parts = parse_url($baseUrl);
+
+            $scheme = $parts['scheme'] ?? 'http';
+            $host   = $parts['host'] ?? $baseUrl;
+
+            $baseUrl = "{$scheme}://{$host}:{$port}";
+        }
+    }
 @endphp
 
 <!-- ── TOPBAR ────────────────────────────────────────────────────────────── -->
