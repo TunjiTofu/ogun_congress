@@ -787,6 +787,17 @@
 </head>
 <body>
 
+@php
+    $appUrl = rtrim(config('app.url'), '/');
+    $parts = parse_url($appUrl);
+
+    $scheme = $parts['scheme'] ?? 'http';
+    $host   = $parts['host'] ?? $appUrl;
+    $port   = $parts['port'] ?? env('APP_PORT');
+
+    $baseUrl = $scheme . '://' . $host . ($port ? ':' . $port : '');
+@endphp
+
 <!-- ── TOPBAR ────────────────────────────────────────────────────────────── -->
 <div class="topbar">
     <div class="topbar-inner">
@@ -1388,6 +1399,7 @@
         <div class="footer-grid">
             <div class="footer-col">
                 <div class="footer-col-title">Navigate</div>
+                <a href="{{ $baseUrl . '/admin' }}">Admin Dashboard</a>
                 <a href="#access">Enter Code</a>
                 <a href="#register">How to Register</a>
                 <a href="#fees">Departments & Fees</a>
