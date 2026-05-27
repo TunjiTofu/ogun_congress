@@ -41,10 +41,10 @@ enum CodeStatus: string
     public function userMessage(): string
     {
         return match($this) {
-            self::PENDING => 'Your payment has not yet been confirmed. Please wait a few minutes and try again, or contact the accountant.',
-            self::CLAIMED => 'This code has already been used to complete a registration. If this is an error, please contact the secretariat.',
-            self::EXPIRED => 'This code has expired. Please contact the accountant to have it reactivated.',
-            self::VOID    => 'This code has been cancelled. Please contact the secretariat for assistance.',
+            self::PENDING => 'Your payment has not yet been confirmed. Please wait a few minutes and try again, or contact the treasurer.',
+            self::CLAIMED => 'This code has already been used to complete a registration. If this is an error, please contact the support team.',
+            self::EXPIRED => 'This code has expired. Please contact the support team to have it reactivated.',
+            self::VOID    => 'This code has been cancelled. Please contact the support team for assistance.',
             self::ACTIVE  => 'Code is valid.',
         };
     }

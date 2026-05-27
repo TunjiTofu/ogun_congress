@@ -34,7 +34,7 @@ class OfflinePaymentResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['accountant', 'super_admin']);
+        return auth()->user()->hasAnyRole(['super_admin']);
     }
 
     // ── Form ──────────────────────────────────────────────────────────────────

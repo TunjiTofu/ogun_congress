@@ -27,7 +27,7 @@
     {{-- Church header --}}
     @if($church)
         <div style="background:linear-gradient(135deg,#020617,#0F172A,#1E293B);border-radius:16px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;border:1px solid #1E293B">
-            <p style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--d-muted);margin-bottom:0.2rem">Church Coordinator</p>
+            <p style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--d-muted);margin-bottom:0.2rem">Youth Leader</p>
             <h1 style="font-size:1.4rem;font-weight:900;color:#F1F5F9;line-height:1.2">{{ $church->name }}</h1>
             <p style="font-size:0.75rem;color:rgba(255,255,255,0.55);margin-top:0.2rem">{{ $church->district?->name }} · Ogun Conference Youth Congress 2026</p>
         </div>

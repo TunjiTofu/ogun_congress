@@ -808,7 +808,7 @@
 <div class="topbar">
     <div class="topbar-inner">
         <span class="topbar-dot"></span>
-        Registration is now open &mdash; Abeokuta 2026 &middot; Aug 16&ndash;22
+        Registration is now open &mdash; {{ setting('camp_name', 'Abeokuta 2026') }}  &middot; {{ setting('camp_dates','August 16 - 23') }}
         <span class="topbar-sep">|</span>
         <a href="#access">Enter your code &rarr;</a>
     </div>
@@ -821,8 +821,8 @@
     <a href="{{ route('home') }}" class="nav-brand">
         <img src="{{ asset('images/congress_logo.png') }}" alt="Congress 2026 Logo" class="nav-logo"/>
         <div class="nav-brand-text">
-            <div class="nav-name">Ogun Conference</div>
-            <div class="nav-sub">Youth Congress &middot; SDA</div>
+            <div class="nav-name">{{ setting('organization_name') }}</div>
+            <div class="nav-sub">{{ setting('camp_name') }}</div>
         </div>
     </a>
     <div class="nav-links">
@@ -864,10 +864,11 @@
         <div class="hero-left">
             <div class="hero-eyebrow">
                 <span class="hero-eyebrow-dot"></span>
-                Abeokuta 2026 &nbsp;&bull;&nbsp; August 16&ndash;22
+                Abeokuta 2026 &nbsp;&bull;&nbsp; {{ setting('camp_dates','August 16 - 23') }}
             </div>
 
             <h1 class="hero-title">
+{{--                {{ setting('camp_theme') }}--}}
                 From the Word<br/><em>to the World</em>
             </h1>
 
@@ -895,15 +896,15 @@
                 <div class="hero-card-header">
                     <img src="{{ asset('images/congress_logo.png') }}" alt="Congress Logo" class="hero-card-logo"/>
                     <div>
-                        <div class="hero-card-eyebrow">Ogun Conference SDA</div>
-                        <div class="hero-card-title">Youth Congress 2026</div>
+                        <div class="hero-card-eyebrow">{{ setting('organization_name') }}</div>
+                        <div class="hero-card-title">{{ setting('camp_name') }}</div>
                     </div>
                 </div>
 
                 <div class="hero-card-grid">
                     <div class="hero-card-item">
                         <div class="hero-card-lbl">Date</div>
-                        <div class="hero-card-val">Aug 16&ndash;22</div>
+                        <div class="hero-card-val">{{ setting('camp_dates','August 16 - 23') }}</div>
                         <div class="hero-card-meta">7 Days</div>
                     </div>
                     <div class="hero-card-item">
@@ -991,7 +992,7 @@
                 </div>
                 <h3 class="access-card-title">Complete Your Form</h3>
                 <p class="access-card-desc">
-                    Have a code from your church coordinator? Enter it here to fill in your personal details and secure your camp spot.
+                    Have a code from your local church youth leader? Enter it here to fill in your personal details and secure your camp spot.
                 </p>
                 <form class="code-form" action="{{ route('registration.validate-code-web') }}" method="POST">
                     @csrf
@@ -999,7 +1000,7 @@
                         <input type="text" name="code" class="code-field"
                                placeholder="OGN-2026-XXXXXX" maxlength="15"
                                oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9\-]/g,'')"
-                               autocomplete="off" spellcheck="false"/>
+                               autocomplete="off" spellcheck="false" required/>
                         <button type="submit" class="btn-submit">Go &rarr;</button>
                     </div>
                 </form>
@@ -1025,7 +1026,7 @@
                     @csrf
                     <div class="code-row">
                         <input type="text" name="code" class="code-field"
-                               placeholder="OGN-2026-XXXXXX" maxlength="15"
+                               placeholder="OGN-2026-XXXXXX" maxlength="15" required
                                oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9\-]/g,'')"
                                autocomplete="off" spellcheck="false"/>
                         <button type="submit" class="btn-submit btn-submit-gold">Enter &rarr;</button>
@@ -1050,7 +1051,7 @@
             <span class="eyebrow"><span class="eyebrow-dot"></span>&nbsp; Registration</span>
             <h2 class="section-title">How to<br/><em>Register</em></h2>
             <p class="section-lede">
-                Registration is coordinated through your local church. Your church coordinator handles payment and code generation on behalf of your congregation.
+                Registration is coordinated through your local church. Your local church youth leader handles payment and code generation on behalf of your congregation.
             </p>
         </div>
 
@@ -1058,8 +1059,8 @@
             <div class="step reveal reveal-delay-1">
                 <span class="step-no">01</span>
                 <div class="step-body">
-                    <div class="step-title">Contact Your Coordinator</div>
-                    <div class="step-desc">Reach your local church coordinator to express interest and confirm your department and age group.</div>
+                    <div class="step-title">Contact Your Youth Leader</div>
+                    <div class="step-desc">Reach your local church youth leader to express interest and confirm your department and age group.</div>
                 </div>
                 <div class="step-foot">Adventurers &middot; Pathfinders &middot; Senior Youth</div>
             </div>
@@ -1067,23 +1068,23 @@
                 <span class="step-no">02</span>
                 <div class="step-body">
                     <div class="step-title">Church Makes Payment</div>
-                    <div class="step-desc">The coordinator pays the total for all registered campers via bank transfer or online using Paystack.</div>
+                    <div class="step-desc">The youth leader pays the total for all registered campers via bank transfer.</div>
                 </div>
-                <div class="step-foot">Bank Transfer or Online</div>
+                <div class="step-foot">Bank Transfer</div>
             </div>
             <div class="step reveal reveal-delay-3">
                 <span class="step-no">03</span>
                 <div class="step-body">
                     <div class="step-title">Receive Your Code</div>
-                    <div class="step-desc">A unique registration code is sent to your phone via SMS once payment is confirmed by the accountant.</div>
+                    <div class="step-desc">A unique registration code is sent to your youth leader's dashboard once payment is confirmed by the treasurer.</div>
                 </div>
-                <div class="step-foot">Delivered via SMS</div>
+                <div class="step-foot">Delivered via Youth Leader's Dashboard</div>
             </div>
             <div class="step step-final reveal reveal-delay-4">
                 <span class="step-no">04</span>
                 <div class="step-body">
                     <div class="step-title">Complete Your Form</div>
-                    <div class="step-desc">Enter your code on this page and fill in the registration wizard to finalize your camp spot.</div>
+                    <div class="step-desc">Enter your code on this page and fill in the registration wizard to finalize your congress spot.</div>
                 </div>
                 <div class="step-foot">You&rsquo;re in!</div>
             </div>
@@ -1134,7 +1135,7 @@
             </div>
             <div>
                 <p class="section-lede">
-                    Fees are set per department based on age group. All registrations are coordinated through your local church coordinator.
+                    Fees are set per department based on age group. All registrations are coordinated through your local church youth leader.
                 </p>
             </div>
         </div>
@@ -1156,9 +1157,10 @@
                     <span class="fee-card-amount">{{ number_format((int) setting('fee_adventurer',5000)) }}</span>
                 </div>
                 <ul class="fee-card-list">
-                    <li>Parent/guardian must accompany camper</li>
+                    <li>Parent/guardian must accompany camper less than 6 years of age</li>
                     <li>Parental consent form required</li>
-                    <li>Registration via church coordinator</li>
+                    <li>Registration via local church</li>
+                    <li>Cover letter from Church Pastor</li>
                 </ul>
             </div>
 
@@ -1178,8 +1180,9 @@
                     <span class="fee-card-amount">{{ number_format((int) setting('fee_pathfinder',5000)) }}</span>
                 </div>
                 <ul class="fee-card-list">
-                    <li>Registration via church coordinator</li>
+                    <li>Registration via local church</li>
                     <li>Parental consent form required</li>
+                    <li>Cover letter from Church Pastor</li>
                 </ul>
             </div>
 
@@ -1199,14 +1202,14 @@
                     <span class="fee-card-amount">{{ number_format((int) setting('fee_senior_youth',7000)) }}</span>
                 </div>
                 <ul class="fee-card-list">
-                    <li>Registration via church coordinator</li>
-                    <li>No consent form required</li>
+                    <li>Registration via local church</li>
+                    <li>Cover letter from Church Pastor</li>
                 </ul>
             </div>
         </div>
 
         <div class="fees-foot reveal">
-            &#128276; All fees are paid through your church coordinator. Contact them directly to confirm your registration and arrange payment.
+            &#128276; All fees are paid through your local church youth leader. Contact them directly to confirm your registration and arrange payment.
         </div>
     </div>
 </section>
@@ -1279,7 +1282,7 @@
             @foreach([
                 ['01', 'All campers must carry their <strong>printed ID card</strong> at all times during camp.'],
                 ['02', 'Campers under 18 must submit a <strong>signed parental consent form</strong> at check-in.'],
-                ['03', 'Participants must wear the <strong>official camp uniform</strong> during formal sessions.'],
+                ['03', 'Participants must wear the <strong>official camp uniform/dress code</strong> during formal sessions.'],
                 ['04', 'Mobile phones should be kept on <strong>silent mode</strong> during services and meetings.'],
                 ['05', 'No camper may <strong>leave the camp venue</strong> without prior permission from officials.'],
                 ['06', 'All campers are expected to <strong>participate respectfully</strong> in all programme activities.'],
@@ -1338,7 +1341,7 @@
             <div class="cform reveal reveal-delay-2">
                 <div class="cform-head">
                     <h3>Send a Message</h3>
-                    <span class="cform-meta">We respond within 24h</span>
+                    <span class="cform-meta">We respond within 24hours</span>
                 </div>
 
                 @if(session('contact_success'))
@@ -1393,8 +1396,8 @@
             <div class="footer-brand">
                 <img src="{{ asset('images/congress_logo.png') }}" alt="Congress Logo" class="footer-logo"/>
                 <div>
-                    <div class="footer-brand-name">Ogun Conference</div>
-                    <div class="footer-brand-sub">Youth Congress &middot; SDA</div>
+                    <div class="footer-brand-name">{{ setting('organization_name') }}</div>
+                    <div class="footer-brand-sub">{{ setting('camp_name') }}</div>
                 </div>
             </div>
             <div class="footer-tagline">
@@ -1445,7 +1448,7 @@
             </div>
             <div>
                 @if(setting('secretariat_phone'))
-                    Secretariat: <a href="tel:{{ setting('secretariat_phone') }}" style="color:var(--gold-2);text-decoration:none">{{ setting('secretariat_phone') }}</a>
+                    Designed & Developed By GratusTechnologies: <a href="tel:2348163513389" style="color:var(--gold-2);text-decoration:none">2348163513389</a>
                 @endif
             </div>
         </div>

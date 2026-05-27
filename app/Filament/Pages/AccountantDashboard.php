@@ -13,6 +13,8 @@ class AccountantDashboard extends Page
     protected static ?string $navigationLabel = 'My Dashboard';
     protected static ?int    $navigationSort  = -10;
     protected static string  $view            = 'filament.pages.accountant-dashboard';
+    protected static ?string $title           = 'Treasurer\'s Dashboard';
+
 
     public static function canAccess(): bool
     {
