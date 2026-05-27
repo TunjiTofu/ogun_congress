@@ -9,6 +9,27 @@ class CreateBulkBatch extends CreateRecord
 {
     protected static string $resource = BulkRegistrationBatchResource::class;
 
+    public function mount(): void
+    {
+        // Block access entirely if registration is closed
+        $closed = setting('registration_open', '1') !== '1'
+            || (setting('registration_closes_at') && now()->gt(\Illuminate\Support\Carbon::parse(setting('registration_closes_at'))));
+
+        if ($closed) {
+            \Filament\Notifications\Notification::make()
+                ->title('Registration is currently closed.')
+                ->body('Enable it under Settings → Registration Control before creating new batches.')
+                ->danger()
+                ->persistent()
+                ->send();
+
+            $this->redirect(static::getResource()::getUrl('index'));
+            return;
+        }
+
+        parent::mount();
+    }
+
     /**
      * Pre-fill church_id from the coordinator's assigned church.
      * This runs before the form is displayed.
@@ -49,3 +70,4 @@ class CreateBulkBatch extends CreateRecord
         return $this->getResource()::getUrl('edit', ['record' => $this->record]);
     }
 }
+

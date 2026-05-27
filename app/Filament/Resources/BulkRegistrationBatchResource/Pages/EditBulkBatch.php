@@ -18,12 +18,26 @@ class EditBulkBatch extends EditRecord
         ];
     }
 
+    // Show a rejection notice at the top of the form
+    protected function getHeaderWidgets(): array
+    {
+        return [];
+    }
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
         // Coordinator: always enforce their church
         if (auth()->user()->hasRole('church_coordinator')) {
             $data['church_id'] = auth()->user()->church_id;
         }
+
+        // If resubmitting a rejected batch, reset to pending_payment and clear rejection reason
+        if ($this->record->status === 'rejected') {
+            $data['status']           = 'pending_payment';
+            $data['rejection_reason'] = null;
+            $data['confirmed_by']     = null;
+        }
+
         unset($data['district_id'], $data['district_id_for_church'], $data['entries'],
             $data['church_display'], $data['district_display'], $data['duplicate_warning']);
         return $data;
@@ -31,8 +45,16 @@ class EditBulkBatch extends EditRecord
 
     protected function afterSave(): void
     {
-        if ($this->record->isDraft()) {
+        if ($this->record->isDraft() || $this->record->isPendingPayment()) {
             $this->record->recalculateTotal();
+        }
+
+        // If coordinator resubmitted, notify them
+        if ($this->record->status === 'pending_payment' && request('was_rejected')) {
+            \Filament\Notifications\Notification::make()
+                ->title('Batch resubmitted for review.')
+                ->success()
+                ->send();
         }
     }
 

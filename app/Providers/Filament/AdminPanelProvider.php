@@ -2,7 +2,15 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Login;                          // ← moved OUT of Pages/Auth/
+use App\Filament\Pages\CampDirectorDashboard;
+use App\Filament\Pages\CheckedInCampers;
 use App\Filament\Pages\CheckInConsole;
+use App\Filament\Pages\CoordinatorCampersPage;
+use App\Filament\Pages\CoordinatorCheckinTrailPage;
+use App\Filament\Pages\DistrictCoordinatorDashboard;
+use App\Filament\Pages\PhotoReviewPage;
+use App\Filament\Pages\RegistrationControlPage;
 use App\Filament\Pages\Reports;
 use App\Filament\Widgets\CategoryBreakdownWidget;
 use App\Filament\Widgets\RecentActivityWidget;
@@ -34,7 +42,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(Login::class)                     // ← register custom login
             ->colors([
                 'primary' => Color::hex('#1B3A6B'),
                 'warning' => Color::Amber,
@@ -59,6 +67,13 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
                 AccountantDashboard::class,
                 CoordinatorDashboard::class,
+                CoordinatorCheckinTrailPage::class,
+                DistrictCoordinatorDashboard::class,
+                CheckedInCampers::class,
+                PhotoReviewPage::class,
+                CoordinatorCampersPage::class,
+                CampDirectorDashboard::class,
+                RegistrationControlPage::class,
             ])
             ->widgets([
                 StatsOverviewWidget::class,

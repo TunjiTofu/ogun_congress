@@ -89,9 +89,37 @@ class CampSettingResource extends Resource
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->label('Add Announcement')
+                    ->label('Add Setting')
+                    ->icon('heroicon-o-plus'),
+
+                // Quick action: set/clear the public announcement banner
+                Tables\Actions\Action::make('set_announcement')
+                    ->label('Announcement Banner')
                     ->icon('heroicon-o-megaphone')
-                    ->mutateFormDataUsing(fn (array $data) => array_merge($data, ['group' => 'announcements'])),
+                    ->color('warning')
+                    ->form([
+                        \Filament\Forms\Components\Textarea::make('announcement')
+                            ->label('Public Announcement')
+                            ->rows(3)
+                            ->placeholder('Leave blank to clear the banner.')
+                            ->helperText('This appears as a banner on the public registration page for all visitors.')
+                            ->default(fn () => setting('announcement_banner', '')),
+                    ])
+                    ->action(function (array $data) {
+                        \App\Models\CampSetting::updateOrCreate(
+                            ['key' => 'announcement_banner'],
+                            [
+                                'value' => trim($data['announcement'] ?? ''),
+                                'label' => 'Announcement Banner',
+                                'group' => 'announcements',
+                            ]
+                        );
+                        \Illuminate\Support\Facades\Cache::forget('camp_settings');
+                        \Filament\Notifications\Notification::make()
+                            ->title(trim($data['announcement'] ?? '') ? 'Announcement banner published.' : 'Announcement banner cleared.')
+                            ->success()->send();
+                    })
+                    ->modalSubmitActionLabel('Publish'),
             ]);
     }
 

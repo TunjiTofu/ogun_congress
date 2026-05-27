@@ -127,6 +127,13 @@
       0 => 'Laravel\\Sentinel\\SentinelServiceProvider',
     ),
   ),
+  'laravel/tinker' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Laravel\\Tinker\\TinkerServiceProvider',
+    ),
+  ),
   'livewire/livewire' => 
   array (
     'aliases' => 
@@ -157,6 +164,17 @@
     'providers' => 
     array (
       0 => 'Termwind\\Laravel\\TermwindServiceProvider',
+    ),
+  ),
+  'opcodesio/log-viewer' => 
+  array (
+    'aliases' => 
+    array (
+      'LogViewer' => 'Opcodes\\LogViewer\\Facades\\LogViewer',
+    ),
+    'providers' => 
+    array (
+      0 => 'Opcodes\\LogViewer\\LogViewerServiceProvider',
     ),
   ),
   'pestphp/pest-plugin-laravel' => 

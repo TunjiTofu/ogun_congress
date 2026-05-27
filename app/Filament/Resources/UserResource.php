@@ -73,31 +73,40 @@ class UserResource extends Resource
                 ->label('Account Active')
                 ->default(true),
 
-            Forms\Components\Section::make('Church Assignment')
-                ->description('Only required for Church Coordinator role. Editable by Super Admin only.')
+            Forms\Components\Section::make('Role Assignment')
+                ->description('Assign district or church based on the user\'s role.')
                 ->schema([
-                    Forms\Components\Select::make('district_id_for_church')
+
+                    // ── District Coordinator: only district_id saved ────────────────
+                    Forms\Components\Select::make('district_id')
                         ->label('District')
                         ->options(\App\Models\District::orderBy('name')->pluck('name', 'id'))
+                        ->searchable()
+                        ->nullable()
                         ->live()
                         ->afterStateUpdated(fn (\Filament\Forms\Set $set) => $set('church_id', null))
-                        ->dehydrated(false)
+                        ->helperText('Required for District Coordinator. Also used to filter churches below.')
                         ->afterStateHydrated(function ($state, $record, \Filament\Forms\Set $set) {
-                            if ($record?->church_id) {
+                            // Pre-populate district from church if not set directly
+                            if (! $record?->district_id && $record?->church_id) {
                                 $church = \App\Models\Church::find($record->church_id);
-                                $set('district_id_for_church', $church?->district_id);
+                                $set('district_id', $church?->district_id);
                             }
                         }),
 
+                    // ── Church Coordinator: district_id + church_id both saved ──────
                     Forms\Components\Select::make('church_id')
                         ->label('Church')
                         ->options(fn (\Filament\Forms\Get $get) =>
-                        \App\Models\Church::where('district_id', $get('district_id_for_church'))
+                        $get('district_id')
+                            ? \App\Models\Church::where('district_id', $get('district_id'))
                             ->orderBy('name')->pluck('name', 'id')
+                            : \App\Models\Church::orderBy('name')->pluck('name', 'id')
                         )
                         ->searchable()
                         ->nullable()
-                        ->helperText('Assign a church to this coordinator.'),
+                        ->helperText('Required for Church Coordinator. Select district first to filter.'),
+
                 ])
                 ->collapsible()
                 ->columns(2),

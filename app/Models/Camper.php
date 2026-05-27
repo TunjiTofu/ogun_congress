@@ -34,6 +34,7 @@ class Camper extends Model implements HasMedia
             'gender'            => Gender::class,
             'category'          => CamperCategory::class,
             'consent_collected' => 'boolean',
+            'is_official' => 'boolean',
         ];
     }
 
@@ -94,6 +95,11 @@ class Camper extends Model implements HasMedia
         return $this->hasMany(CheckinEvent::class);
     }
 
+    public function campRole(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\CampRole::class);
+    }
+
     // ── Scopes ────────────────────────────────────────────────────────────────
 
     public function scopeAdventurers($query)
@@ -145,5 +151,27 @@ class Camper extends Model implements HasMedia
         return $this->checkinEvents()
             ->where('event_type', \App\Enums\CheckinEventType::CHECK_IN)
             ->exists();
+    }
+
+    /**
+     * Add a computed is_checked_in boolean based on the last check-in event.
+     */
+    public function scopeWithLastCheckinStatus(Builder $query): void
+    {
+        $query->addSelect([
+            'is_checked_in' => \App\Models\CheckinEvent::select('event_type')
+                ->whereColumn('camper_id', 'campers.id')
+                ->latest('occurred_at')
+                ->limit(1),
+        ])->selectRaw("
+            CASE
+                WHEN (
+                    SELECT event_type FROM checkin_events
+                    WHERE camper_id = campers.id
+                    ORDER BY occurred_at DESC LIMIT 1
+                ) = 'check_in' THEN 1
+                ELSE 0
+            END as is_checked_in
+        ");
     }
 }

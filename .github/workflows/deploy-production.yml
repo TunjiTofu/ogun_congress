@@ -31,7 +31,7 @@ jobs:
 
             echo "→ Restoring PHP handler and user.ini..."
             grep -q 'alt-php84' public/.htaccess || printf '\n<IfModule mime_module>\n    AddHandler application/x-httpd-alt-php84 .php\n</IfModule>\n' >> public/.htaccess
-            echo '; cPanel-generated php ini directives, do not edit' > public/.user.ini
+            printf '; cPanel-generated php ini directives, do not edit\nupload_tmp_dir=/home2/gratusco/tmp\nsys_temp_dir=/home2/gratusco/tmp\n' > public/.user.ini
 
             echo "→ Installing dependencies..."
             $PHP /usr/local/bin/composer install --no-scripts

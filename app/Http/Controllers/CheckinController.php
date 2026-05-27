@@ -2,188 +2,277 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CheckinEventType;
 use App\Models\Camper;
 use App\Models\CheckinEvent;
 use App\Models\User;
-use App\Enums\CheckinEventType;
-use App\Repositories\Interfaces\CamperRepositoryInterface;
-use App\Repositories\Interfaces\CheckinRepositoryInterface;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class CheckinController extends Controller
 {
-    public function __construct(
-        private readonly CamperRepositoryInterface  $camperRepository,
-        private readonly CheckinRepositoryInterface $checkinRepository,
-    ) {}
-
-    /**
-     * POST /api/checkin/auth
-     *
-     * Authenticates a PWA device with a staff PIN.
-     * Returns a Sanctum token scoped to checkin abilities.
-     */
     public function auth(Request $request): JsonResponse
     {
-        $request->validate([
-            'device_id' => ['required', 'string', 'max:100'],
-            'email'     => ['required', 'email'],
-            'pin'       => ['required', 'string'],
+        Log::channel('stack')->info('checkin.auth.attempt', [
+            'email'     => $request->email,
+            'device_id' => $request->device_id,
+            'ip'        => $request->ip(),
         ]);
 
-        $user = User::where('email', $request->email)
-            ->where('is_active', true)
-            ->first();
+        $request->validate([
+            'email'     => ['required', 'email'],
+            'pin'       => ['required', 'string'],
+            'device_id' => ['nullable', 'string'],
+        ]);
+
+        $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->pin, $user->password)) {
-            Log::warning('checkin.auth_failed', ['email' => $request->email]);
-            throw ValidationException::withMessages([
-                'pin' => 'Invalid credentials.',
-            ]);
+            Log::warning('checkin.auth.failed', ['email' => $request->email]);
+            return response()->json(['success' => false, 'message' => 'Invalid credentials.'], 401);
         }
 
-        // Revoke any existing checkin tokens for this device to prevent accumulation
-        $user->tokens()
-            ->where('name', 'checkin:' . $request->device_id)
-            ->delete();
+        if (! $user->hasAnyRole(['secretariat', 'security', 'camp_director', 'super_admin'])) {
+            Log::warning('checkin.auth.unauthorized', [
+                'email' => $request->email,
+                'roles' => $user->getRoleNames(),
+            ]);
+            return response()->json(['success' => false, 'message' => 'Your account does not have check-in access.'], 403);
+        }
 
-        $token = $user->createToken(
-            name:       'checkin:' . $request->device_id,
-            abilities:  ['checkin'],
-            expiresAt:  now()->addDays(7),
-        );
+        $user->tokens()->where('name', 'like', 'checkin-%')->delete();
 
-        Log::info('checkin.auth_success', [
+        $token = $user->createToken('checkin-' . ($request->device_id ?? 'device'))->plainTextToken;
+
+        Log::info('checkin.auth.success', [
             'user_id'   => $user->id,
+            'email'     => $user->email,
             'device_id' => $request->device_id,
         ]);
 
         return response()->json([
             'success' => true,
-            'token'   => $token->plainTextToken,
-            'user'    => [
-                'name'  => $user->name,
-                'roles' => $user->getRoleNames(),
-            ],
+            'token'   => $token,
+            'user'    => ['name' => $user->name, 'roles' => $user->getRoleNames()],
         ]);
     }
 
-    /**
-     * GET /api/checkin/sync
-     *
-     * Returns paginated CLAIMED campers for offline cache.
-     * Requires valid Sanctum token with [checkin] ability.
-     */
     public function sync(Request $request): JsonResponse
     {
-        $page    = (int) $request->query('page', 1);
-        $results = $this->camperRepository->getClaimedForSync($page, 500);
+        $perPage = min((int) $request->input('per_page', 500), 500);
+        $page    = (int) $request->input('page', 1);
 
-        return response()->json([
-            'success'      => true,
-            'data'         => $results->items(),
-            'current_page' => $results->currentPage(),
-            'last_page'    => $results->lastPage(),
-            'total'        => $results->total(),
+        Log::info('checkin.sync.request', [
+            'user_id' => auth()->id(),
+            'page'    => $page,
+            'per_page'=> $perPage,
         ]);
+
+        try {
+            $campers = Camper::with(['media', 'church.district'])
+                ->orderBy('full_name')
+                ->paginate($perPage, ['*'], 'page', $page);
+
+            $data = collect($campers->items())->map(fn (Camper $c) => $this->formatCamper($c));
+
+            Log::info('checkin.sync.success', [
+                'user_id' => auth()->id(),
+                'page'    => $page,
+                'count'   => $data->count(),
+                'total'   => $campers->total(),
+            ]);
+
+            return response()->json([
+                'data'         => $data,
+                'total'        => $campers->total(),
+                'current_page' => $campers->currentPage(),
+                'last_page'    => $campers->lastPage(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('checkin.sync.error', [
+                'user_id' => auth()->id(),
+                'error'   => $e->getMessage(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'Sync failed: ' . $e->getMessage()], 500);
+        }
     }
 
-    /**
-     * POST /api/checkin/events
-     *
-     * Accepts an array of offline check-in events.
-     * Fully idempotent — duplicate UUIDs are silently ignored.
-     * Requires valid Sanctum token with [checkin] ability.
-     */
+    public function lookup(string $identifier): JsonResponse
+    {
+        $identifier = strtoupper(trim($identifier));
+
+        Log::info('checkin.lookup', [
+            'user_id'    => auth()->id(),
+            'identifier' => $identifier,
+        ]);
+
+        try {
+            $camper = Camper::with(['media', 'church.district'])
+                ->where('camper_number', $identifier)
+                ->first();
+
+            if (! $camper) {
+                $camper = Camper::with(['media', 'church.district'])
+                    ->where('full_name', 'like', '%' . $identifier . '%')
+                    ->first();
+            }
+
+            if (! $camper) {
+                Log::info('checkin.lookup.not_found', ['identifier' => $identifier]);
+                return response()->json(['success' => false, 'message' => 'Camper not found.'], 404);
+            }
+
+            Log::info('checkin.lookup.found', [
+                'camper_number' => $camper->camper_number,
+                'identifier'    => $identifier,
+            ]);
+
+            return response()->json(['success' => true, 'camper' => $this->formatCamper($camper)]);
+        } catch (\Throwable $e) {
+            Log::error('checkin.lookup.error', ['error' => $e->getMessage(), 'identifier' => $identifier]);
+            return response()->json(['message' => 'Lookup failed: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function storeEvents(Request $request): JsonResponse
     {
-        $request->validate([
-            'events'                    => ['required', 'array', 'min:1', 'max:50'],
-            'events.*.uuid'             => ['required', 'uuid'],
-            'events.*.camper_number'    => ['required', 'string'],
-            'events.*.event_type'       => ['required', 'string', 'in:check_in,check_out,programme_attendance'],
-            'events.*.scanned_at'       => ['required', 'date'],
-            'events.*.device_id'        => ['required', 'string'],
-            'events.*.consent_collected'=> ['nullable', 'boolean'],
-            'events.*.session_id'       => ['nullable', 'integer'],
-            'events.*.notes'            => ['nullable', 'string'],
+        Log::info('checkin.events.incoming', [
+            'user_id' => auth()->id(),
+            'count'   => count($request->input('events', [])),
+            'ip'      => $request->ip(),
         ]);
 
-        // Resolve camper_number → camper_id for each event
-        $camperNumbers = array_column($request->events, 'camper_number');
-        $campers       = Camper::whereIn('camper_number', $camperNumbers)
-            ->pluck('id', 'camper_number');
-
-        $enriched = array_filter(
-            array_map(function ($event) use ($campers) {
-                if (! isset($campers[$event['camper_number']])) {
-                    return null; // Unknown camper — skip
-                }
-
-                return array_merge($event, [
-                    'camper_id' => $campers[$event['camper_number']],
-                ]);
-            }, $request->events)
-        );
-
-        $inserted = $this->checkinRepository->bulkInsertDeduped(array_values($enriched));
-        $skipped  = count($request->events) - $inserted;
-
-        if ($inserted > 0) {
-            Log::info('checkin.events_synced', [
-                'inserted'  => $inserted,
-                'skipped'   => $skipped,
-                'device_id' => $request->events[0]['device_id'] ?? 'unknown',
+        try {
+            $request->validate([
+                'events'                         => ['required', 'array', 'min:1'],
+                'events.*.uuid'                  => ['required', 'string', 'max:100'],
+                'events.*.camper_number'          => ['required', 'string'],
+                'events.*.event_type'             => ['required', 'string', 'in:check_in,check_out,programme_attendance'],
+                'events.*.occurred_at'            => ['required', 'date'],
+                'events.*.programme_session_id'   => ['nullable', 'integer'],
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('checkin.events.validation_failed', [
+                'errors' => $e->errors(),
+                'input'  => $request->input('events'),
+            ]);
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
         }
 
+        $saved   = 0;
+        $skipped = 0;
+        $errors  = [];
+
+        foreach ($request->input('events') as $event) {
+            try {
+                if (CheckinEvent::where('uuid', $event['uuid'])->exists()) {
+                    $skipped++;
+                    Log::debug('checkin.events.duplicate', ['uuid' => $event['uuid']]);
+                    continue;
+                }
+
+                $camper = Camper::where('camper_number', $event['camper_number'])->first();
+
+                if (! $camper) {
+                    $errors[] = 'Camper not found: ' . $event['camper_number'];
+                    Log::warning('checkin.events.camper_not_found', ['camper_number' => $event['camper_number']]);
+                    continue;
+                }
+
+                CheckinEvent::create([
+                    'uuid'                 => $event['uuid'],
+                    'camper_id'            => $camper->id,
+                    'event_type'           => CheckinEventType::from($event['event_type']),
+                    'programme_session_id' => $event['programme_session_id'] ?? null,
+                    'occurred_at'          => $event['occurred_at'],
+                    'device_id'            => $event['device_id'] ?? null,
+                    'recorded_by'          => auth()->id(),
+                ]);
+
+                // Mark consent collected on camper record
+                if (! empty($event['consent_collected'])) {
+                    $camper->update(['consent_collected' => true]);
+                }
+
+                $saved++;
+
+            } catch (\Throwable $e) {
+                $errors[] = $e->getMessage();
+                Log::error('checkin.events.item_error', [
+                    'uuid'  => $event['uuid'] ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info('checkin.events.complete', [
+            'user_id' => auth()->id(),
+            'saved'   => $saved,
+            'skipped' => $skipped,
+            'errors'  => count($errors),
+        ]);
+
         return response()->json([
-            'success'  => true,
-            'inserted' => $inserted,
-            'skipped'  => $skipped,
+            'saved'   => $saved,
+            'skipped' => $skipped,
+            'total'   => count($request->input('events')),
+            'errors'  => $errors,
         ]);
     }
 
-    /**
-     * GET /api/checkin/camper/{code}
-     *
-     * Real-time camper lookup for online check-in.
-     * Returns full card data including photo URL.
-     */
-    public function camper(string $code): JsonResponse
+    public function sessions(): JsonResponse
     {
-        $camper = $this->camperRepository->findByCamperNumber($code);
+        $sessions = \App\Models\ProgrammeSession::where('is_active', true)
+            ->whereDate('date', today())
+            ->orderBy('start_time')
+            ->get(['id', 'title', 'date', 'start_time', 'end_time', 'venue']);
 
-        if (! $camper) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Camper not found.',
-            ], 404);
-        }
-
-        $latestEvent = $this->checkinRepository->getLatestForCamper($camper->id);
-
-        return response()->json([
-            'success' => true,
-            'camper'  => [
-                'camper_number'     => $camper->camper_number,
-                'full_name'         => $camper->full_name,
-                'category'          => $camper->category->label(),
-                'badge_color'       => $camper->badge_color,
-                'church'            => $camper->church->name ?? null,
-                'district'          => $camper->church->district->name ?? null,
-                'consent_collected' => $camper->consent_collected,
-                'consent_required'  => $camper->requiresConsentForm(),
-                'photo_url'         => $camper->getFirstMediaUrl('photo', 'thumb'),
-                'latest_event'      => $latestEvent ? [
-                    'type'       => $latestEvent->event_type->label(),
-                    'scanned_at' => $latestEvent->scanned_at->toISOString(),
-                ] : null,
-            ],
+        Log::info('checkin.sessions.fetched', [
+            'user_id' => auth()->id(),
+            'count'   => $sessions->count(),
+            'date'    => today()->toDateString(),
         ]);
+
+        return response()->json($sessions);
+    }
+
+    private function formatCamper(Camper $c): array
+    {
+        $lastEventType = CheckinEvent::where('camper_id', $c->id)
+            ->whereIn('event_type', ['check_in', 'check_out'])
+            ->latest('occurred_at')
+            ->value('event_type');
+
+        $isCheckedIn = $lastEventType === 'check_in'
+            || (is_object($lastEventType) && $lastEventType === CheckinEventType::CHECK_IN);
+
+        $lastEvent = CheckinEvent::with('recordedBy')
+            ->where('camper_id', $c->id)
+            ->whereIn('event_type', ['check_in', 'check_out'])
+            ->latest('occurred_at')
+            ->first();
+
+        return [
+            'camper_number'          => $c->camper_number,
+            'full_name'              => $c->full_name,
+            'gender'                 => $c->gender?->value,
+            'category'               => $c->category?->label() ?? $c->category?->value,
+            'club_rank'              => $c->club_rank,
+            'church'                 => $c->church?->name,
+            'district'               => $c->church?->district?->name,
+            'photo_url'              => $c->getFirstMedia('photo')
+                ? route('camper.photo', $c->id)
+                : null,
+            'is_checked_in'          => $isCheckedIn,
+            'requires_consent'       => $c->requiresConsentForm(),
+            'consent_required'       => $c->requiresConsentForm(),
+            'consent_collected'      => (bool) $c->consent_collected,
+            'last_event_type'        => $lastEvent ? (is_string($lastEvent->event_type) ? $lastEvent->event_type : $lastEvent->event_type?->value) : null,
+            'last_event_at'          => $lastEvent?->occurred_at?->format('g:i A, d M Y'),
+            'last_event_by'          => $lastEvent?->recordedBy?->name,
+        ];
     }
 }

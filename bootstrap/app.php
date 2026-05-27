@@ -1,9 +1,13 @@
 <?php
 
+use App\Http\Middleware\EnforceCampOver;
+use App\Http\Middleware\ExtractBearerToken;
 use App\Http\Middleware\SetAppTimezone;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -20,11 +24,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // Exclude Paystack webhook from CSRF verification
         $middleware->validateCsrfTokens(except: [
             'api/webhooks/paystack',
+            'api/checkin/auth',
+            'api/webhooks/*',
         ]);
 
         // API middleware group
         $middleware->api(prepend: [
-            EnsureFrontendRequestsAreStateful::class,
+//            EnsureFrontendRequestsAreStateful::class,
+            ExtractBearerToken::class,
         ]);
 
         // Aliases
@@ -33,9 +40,26 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
+
+        // Force-logout non-super_admin when camp is over
+        $middleware->appendToGroup('web', EnforceCampOver::class);
+
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // When an unauthenticated request hits an API endpoint,
+        // return a proper 401 JSON instead of crashing on route('login')
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'message' => 'Unauthenticated. Please log in to the check-in app.',
+                ], 401);
+            }
+
+            // Web requests → Filament login
+//            return redirect()->route('filament.admin.auth.login');
+            return redirect('/admin/login');
+        });
+
     })
     ->withProviders([
         App\Providers\AppServiceProvider::class,
