@@ -215,9 +215,9 @@ Route::middleware(['auth'])->prefix('artisan')->name('artisan.')->group(function
         $allowed = [
             'RolesSeeder',
             'DatabaseSeeder',
-            'DistrictSeeder',
-            'ChurchSeeder',
+            'DistrictAndChurchSeeder',
             'CampRoleSeeder',
+            'RolesAndPermissionsSeeder'
         ];
 
         $class = request('class', 'RolesAndPermissionsSeeder');
