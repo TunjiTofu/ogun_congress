@@ -8,7 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::disableForeignKeyConstraints();
+
         Schema::dropIfExists('programme_sessions');
+
+        Schema::enableForeignKeyConstraints();
 
         Schema::create('programme_sessions', function (Blueprint $table) {
             $table->id();
@@ -19,7 +23,9 @@ return new class extends Migration
             $table->time('end_time')->nullable();
             $table->string('venue')->nullable()->default('Main Hall');
             $table->boolean('is_active')->default(true);
-            $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('created_by')
+                ->constrained('users')
+                ->cascadeOnDelete();
 
             $table->timestamps();
 
