@@ -7,11 +7,14 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Models\Church;
 use App\Models\District;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use App\Mail\AdminWelcomeMail;
+use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\Models\Role;
 
 class AdminImportAction extends Action
@@ -99,16 +102,33 @@ class AdminImportAction extends Action
                         continue;
                     }
 
+                    $plainPwd = 'P@ssword.123';
                     $user = User::create([
-                        'name'        => $name,
-                        'email'       => $email,
-                        'password'    => Hash::make('P@ssword.123'),
-                        'church_id'   => $churchId,
-                        'district_id' => $districtId,
+                        'name'               => $name,
+                        'email'              => $email,
+                        'password'           => Hash::make($plainPwd),
+                        'temp_password'      => $plainPwd,
+                        'must_change_password'=> true,
+                        'church_id'          => $churchId,
+                        'district_id'        => $districtId,
+                        'is_active'          => true,
                     ]);
 
                     $roleModel = Role::findByName($role, 'web');
                     $user->assignRole($roleModel);
+
+                    // Send welcome email with credentials
+                    try {
+                        Mail::to($user->email)->send(
+                            new AdminWelcomeMail($user, $plainPwd, ucfirst(str_replace('_', ' ', $role)))
+                        );
+                    } catch (\Throwable $mailEx) {
+                        // Log mail failure but don't abort import
+                        Log::warning('admin_import.mail_failed', [
+                            'email' => $user->email, 'error' => $mailEx->getMessage()
+                        ]);
+                    }
+
                     $imported++;
                 }
 

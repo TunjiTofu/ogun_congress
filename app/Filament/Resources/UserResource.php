@@ -3,13 +3,17 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
+use App\Mail\AdminWelcomeMail;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 class UserResource extends Resource
@@ -123,6 +127,15 @@ class UserResource extends Resource
 
                 Tables\Columns\TextColumn::make('phone')->placeholder('—'),
 
+                Tables\Columns\TextColumn::make('temp_password')
+                    ->label('Temp Password')
+                    ->placeholder('—')
+                    ->copyable()
+                    ->copyMessage('Password copied')
+                    ->fontFamily('mono')
+                    ->visible(fn () => auth()->user()->hasRole('super_admin'))
+                    ->tooltip('Temporary password — blank once changed by user'),
+
                 Tables\Columns\TextColumn::make('roles.name')
                     ->label('Role')
                     ->badge()
@@ -150,6 +163,36 @@ class UserResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+
+                Tables\Actions\Action::make('reset_password')
+                    ->label('Reset Password')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->visible(fn () => auth()->user()->hasRole('super_admin'))
+                    ->requiresConfirmation()
+                    ->modalDescription('A new temporary password will be generated and emailed to the user. They must change it on next login.')
+                    ->action(function (User $record) {
+                        $newPwd = 'Tmp@' . strtoupper(Str::random(5)) . rand(10, 99) . '!';
+                        $record->update([
+                            'password'             => Hash::make($newPwd),
+                            'temp_password'        => $newPwd,
+                            'must_change_password' => true,
+                        ]);
+                        $role = $record->getRoleNames()->first() ?? 'admin';
+                        try {
+                            Mail::to($record->email)->send(
+                                new AdminWelcomeMail($record, $newPwd, ucfirst(str_replace('_', ' ', $role)))
+                            );
+                            Notification::make()
+                                ->title('Password reset. Credentials emailed to ' . $record->email)
+                                ->success()->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()
+                                ->title('Password reset, but email failed: ' . $e->getMessage())
+                                ->warning()->send();
+                        }
+                    }),
+
                 Tables\Actions\Action::make('deactivate')
                     ->label('Deactivate')
                     ->icon('heroicon-o-no-symbol')

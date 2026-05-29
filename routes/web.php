@@ -4,6 +4,8 @@ use App\Http\Controllers\BulkIdCardController;
 use App\Http\Controllers\CamperExportController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\RegistrationController;
+use App\Models\CampMedia;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -71,6 +73,11 @@ Route::get('/verify/{camper_number}', function (string $camper_number) {
 
 // ── Landing page ──────────────────────────────────────────────────────────────
 Route::get('/', fn () => view('welcome'))->name('home');
+Route::get('/old', fn () => view('welcome2'))->name('home2');
+
+// Global named 'login' route — required by Laravel's auth middleware
+// Filament's logout and auth redirects rely on this
+Route::get('/login', fn () => redirect('/admin/login'))->name('login');
 
 // ── Registration ──────────────────────────────────────────────────────────────
 Route::prefix('registration')->name('registration.')->group(function () {
@@ -100,10 +107,10 @@ Route::get('/batch-payment/callback/{batch}', [
 
 // ── Coordinator portal ────────────────────────────────────────────────────────
 Route::prefix('coordinator-portal')->name('coordinator.portal.')->group(function () {
-    Route::get('/',                             [App\Http\Controllers\CoordinatorPortalController::class, 'index'])->name('index');
-    Route::post('/login',                       [App\Http\Controllers\CoordinatorPortalController::class, 'login'])->name('login');
-    Route::get('/dashboard',                    [App\Http\Controllers\CoordinatorPortalController::class, 'dashboard'])->name('dashboard');
-    Route::post('/logout',                      [App\Http\Controllers\CoordinatorPortalController::class, 'logout'])->name('logout');
+    Route::get('/', [App\Http\Controllers\CoordinatorPortalController::class, 'index'])->name('index');
+    Route::post('/login', [App\Http\Controllers\CoordinatorPortalController::class, 'login'])->name('do-login');
+    Route::get('/dashboard', [App\Http\Controllers\CoordinatorPortalController::class, 'dashboard'])->name('dashboard');
+    Route::post('/logout', [App\Http\Controllers\CoordinatorPortalController::class, 'logout'])->name('logout');
     Route::get('/logout', function () {
         auth()->logout();
         session()->forget('coordinator_logged_in');
@@ -132,6 +139,20 @@ Route::get('/documents/download/{path}', function (string $path) {
         'Content-Disposition' => 'inline; filename="' . basename($filePath) . '"',
     ]);
 })->name('documents.download');
+
+// ── Album page (stub — full implementation pending) ──────────────────────────
+Route::get('/album', function () {
+    if (setting('media_upload_enabled', '0') !== '1') {
+        abort(404);
+    }
+    $media = CampMedia::where('status', 'approved')
+        ->with('district')
+        ->orderBy('district_id')
+        ->orderByDesc('created_at')
+        ->get()
+        ->groupBy('district.name');
+    return view('album', compact('media'));
+})->name('album.index');
 
 // ── PWA Check-in app ─────────────────────────────────────────────────────────
 // The JS handles its own auth (Sanctum token) — no Laravel middleware needed here
@@ -247,4 +268,20 @@ Route::middleware(['auth'])->prefix('artisan')->name('artisan.')->group(function
         }
     })->name('optimize.clear');
 
+});
+
+Route::get('/test-email', function (Request $request) {
+
+    $user = (object) [
+        'name' => 'John Doe',
+        'email' => 'johnd@gmail.com',
+    ];
+
+    return view('emails.admin-welcome', [
+        'user' => $user,
+        'plainPassword' => 'TempPassword@123',
+        'roleName' => 'Super Admin',
+        'adminUrl' => url('/admin'),
+        'landingUrl' => url('/'),
+    ]);
 });
