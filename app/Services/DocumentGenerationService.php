@@ -163,14 +163,13 @@ class DocumentGenerationService
         }
 
         // Encode data into a QR matrix via BaconQrCode low-level API.
-        // BaconQrCode v2.x uses dasprid/enum — values are accessed via __callStatic.
-        // method_exists() returns FALSE for __callStatic, so we cannot use it to detect.
-        // Try M() first (v2.x); fall back to M constant access (v3.x PHP enum).
-        try {
-            $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M();
-        } catch (\Throwable $e) {
-            $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M;
-        }
+        // BaconQrCode v2.x (dasprid/enum): use __callStatic — e.g. M().
+        // Do NOT access ::M as a constant — it is protected and PHP 8.4 throws.
+        // Suppress deprecation notices from BaconQrCode v2.x on PHP 8.4
+        // (these are harmless "nullable parameter" deprecations, not errors).
+        $prevErrorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+        $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M();
+        error_reporting($prevErrorLevel);
 
         $qrCode  = \BaconQrCode\Encoder\Encoder::encode(
             $content,

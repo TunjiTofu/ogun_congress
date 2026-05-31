@@ -25,10 +25,10 @@ class ListCampers extends ListRecords
      * Custom view — shows card grid on mobile, table on desktop.
      * Filament renders this via getView().
      */
-    public function getView(): string
-    {
-        return 'filament.pages.campers-list';
-    }
+//    public function getView(): string
+//    {
+//        return 'filament.pages.campers-list';
+//    }
 
     public function getViewData(): array
     {
