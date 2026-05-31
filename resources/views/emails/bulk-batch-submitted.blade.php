@@ -37,8 +37,8 @@
     <div class="gold-bar"></div>
     <div class="body">
         <div class="alert">
-            <strong>&#128276; Action Required</strong>
-            A church coordinator has submitted a new bulk registration batch and is awaiting payment confirmation.
+            <strong>&#8358; Action Required</strong>
+            A youth leader has submitted a new bulk registration batch and is awaiting payment confirmation.
         </div>
 
         <div class="info-grid">
@@ -74,7 +74,7 @@
         </p>
 
         <div class="btn-wrap">
-            <a href="{{ $adminUrl }}" class="btn">Review in Admin Dashboard &rarr;</a>
+            <a href="{{ $adminUrl }}" style="color: #FFFFFF" class="btn">Review in Admin Dashboard &rarr;</a>
         </div>
 
         <div class="divider"></div>
