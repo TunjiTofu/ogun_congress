@@ -230,15 +230,57 @@ class BulkIdCardController extends Controller
     private function encodeQr(Camper $c): ?string
     {
         try {
-            $qr = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')
-                ->size(120)
-                ->errorCorrection('M')
-                ->generate('OGN:' . $c->camper_number);
-
-            return 'data:image/png;base64,' . base64_encode($qr);
+            return $this->generateQrPngWithGd('OGN:' . $c->camper_number, 120);
         } catch (\Throwable $e) {
             Log::warning('id_card.qr_encode_failed', ['camper' => $c->id, 'error' => $e->getMessage()]);
             return null;
         }
+    }
+
+    /**
+     * Generate a QR code PNG using pure GD — no Imagick required.
+     * BaconQrCode (already installed) provides the bit matrix;
+     * GD renders it to PNG.
+     */
+    private function generateQrPngWithGd(string $content, int $targetSize = 120): string
+    {
+        $prevErrorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+        $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M();
+        error_reporting($prevErrorLevel);
+
+        $qrCode  = \BaconQrCode\Encoder\Encoder::encode($content, $ecLevel, 'ISO-8859-1');
+        $matrix  = $qrCode->getMatrix();
+        $modules = $matrix->getWidth();
+
+        $quietZone    = 4;
+        $totalModules = $modules + $quietZone * 2;
+        $cellSize     = max(1, (int) floor($targetSize / $totalModules));
+        $imageSize    = $totalModules * $cellSize;
+
+        $img   = imagecreatetruecolor($imageSize, $imageSize);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+        imagefill($img, 0, 0, $white);
+
+        for ($row = 0; $row < $modules; $row++) {
+            for ($col = 0; $col < $modules; $col++) {
+                if ($matrix->get($col, $row) !== 0) {
+                    $x1 = ($col + $quietZone) * $cellSize;
+                    $y1 = ($row + $quietZone) * $cellSize;
+                    imagefilledrectangle($img, $x1, $y1, $x1 + $cellSize - 1, $y1 + $cellSize - 1, $black);
+                }
+            }
+        }
+
+        ob_start();
+        imagepng($img);
+        $png = ob_get_clean();
+        imagedestroy($img);
+
+        if (empty($png)) {
+            throw new \RuntimeException('GD imagepng() returned empty output');
+        }
+
+        return 'data:image/png;base64,' . base64_encode($png);
     }
 }
