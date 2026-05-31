@@ -25,27 +25,7 @@ class Camper extends Model implements HasMedia
 
     use HasFactory;
 
-    protected $fillable = [
-        'registration_code_id',
-        'camper_number',
-        'full_name',
-        'phone',
-        'date_of_birth',
-        'gender',
-        'category',
-        'home_address',
-        'church_id',
-        'ministry',
-        'club_rank',
-        'volunteer_role',
-        'photo_path',
-        'badge_color',
-        'id_card_path',
-        'consent_form_path',
-        'consent_collected',
-        'photo_status',
-        'photo_rejection_reason',
-    ];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {
