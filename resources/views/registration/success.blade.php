@@ -148,7 +148,7 @@
         <div class="bg-navy text-white rounded-2xl p-6 text-sm space-y-2">
             <h3 class="font-bold text-gold">Before You Arrive</h3>
             <ul class="space-y-1 text-white/80">
-                <li>&#10003; Print and bring your <strong>ID card</strong></li>
+{{--                <li>&#10003; Print and bring your <strong>ID card</strong></li>--}}
                 <li x-show="needsConsent">&#10003; Print, sign, and bring the <strong>consent form</strong></li>
                 <li>&#10003; Camp begins: <strong>{{ setting('camp_dates', 'TBA') }}</strong></li>
                 <li>&#10003; Venue: <strong>{{ setting('camp_venue', 'TBA') }}</strong></li>
