@@ -1,6 +1,13 @@
 {{-- Add this to your Filament login view or use the extraLoginAttributes --}}
 {{-- File: resources/views/filament/auth/login.blade.php --}}
 <x-filament-panels::page.simple>
+    @if(session('password_changed'))
+        <div style="background:#052E16;border:1.5px solid #22C55E;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;text-align:center">
+            <p style="font-weight:700;color:#86EFAC;font-size:0.92rem">✅ Password changed successfully</p>
+            <p style="color:#86EFAC;font-size:0.8rem;margin-top:4px;opacity:0.8">Please log in with your new password.</p>
+        </div>
+    @endif
+
     @if(session('camp_over') || setting('camp_over', '0') === '1')
         <div style="background:#7F1D1D;border:1.5px solid #EF4444;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.25rem;text-align:center">
             <p style="font-size:1.2rem;margin-bottom:0.25rem">🔒</p>

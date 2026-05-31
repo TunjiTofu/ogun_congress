@@ -7,13 +7,13 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: DejaVu Sans, Arial, sans-serif; background: #fff; }
 
-        /* ── Grid: 2 cards per row, 2 rows per page ── */
+        /* ── Grid: 2 cards per row, 3 rows per page = 6 cards per page ── */
         .page { width: 100%; }
         .page-break { page-break-after: always; }
         .row { display: table; width: 100%; margin-bottom: 3mm; }
         .col { display: table-cell; width: 50%; padding: 0 2.5mm; vertical-align: top; }
 
-        /* ── Card — portrait CR80 style, scaled to fit A4 half-column ── */
+        /* ── Card ── */
         .id-card {
             width: 55mm;
             border: 0.5mm solid #c8ccd4;
@@ -44,11 +44,10 @@
         .info-cell { vertical-align: top; }
         .camper-name { font-size: 7pt; font-weight: bold; line-height: 1.2; word-break: break-word; margin-bottom: 0.8mm; }
         .camper-code { font-family: DejaVu Sans Mono; font-size: 4.5pt; color: #6B7280; margin-bottom: 1.5mm; }
-        .dept-badge { color: #fff; font-size: 4.5pt; font-weight: bold; padding: 0.4mm 1.5mm; display: inline-block; border-radius: 0.5mm; }
         .dept-line { font-size: 4.5pt; font-weight: bold; margin-bottom: 1mm; line-height: 1.4; }
-        .dept-badge { color: #fff; padding: 0.3mm 1.2mm; border-radius: 0.5mm; display: inline; }
+        .dept-badge { color: #fff; padding: 0.3mm 1.2mm; border-radius: 0.5mm; display: inline; font-size: 4.5pt; }
         .rank-sep { color: #6B7280; font-weight: normal; }
-        .role-line { font-weight:900;text-transform:uppercase;letter-spacing:0.8pt;margin-top:1.5mm;display:inline-block;padding:0.7mm 1.8mm;border-radius:1mm;color:#fff;font-size:5.5pt;word-break:break-word; }
+        .role-line { font-weight:900; text-transform:uppercase; letter-spacing:0.8pt; margin-top:1.5mm; display:inline-block; padding:0.7mm 1.8mm; border-radius:1mm; color:#fff; font-size:5.5pt; word-break:break-word; }
 
         /* Details */
         .details-table { width: 49mm; margin: 1.5mm 3mm 0; border-collapse: collapse; border-top: 0.3pt solid #E5E7EB; }
@@ -63,7 +62,7 @@
         .qr-img-cell { width: 15mm; text-align: right; }
         .qr-img-cell img { width: 14mm; height: 14mm; display: block; margin-left: auto; }
 
-        /* Footer */
+        /* Footer band on card */
         .footer-band { width: 100%; margin-top: 1mm; }
         .footer-band table { width: 100%; border-collapse: collapse; }
         .footer-band td { padding: 1mm 2.5mm; font-size: 3.8pt; color: #9CA3AF; vertical-align: middle; }
@@ -103,7 +102,7 @@
 @endforeach
 
 <div class="summary">
-    {{ $campers->count() }} ID cards &bull; Ogun Conference Youth Congress {{ $campYear }} &bull; Printed: {{ now()->format('d M Y') }}
+    {{ $totalCards }} ID cards &bull; Ogun Conference Youth Congress {{ $campYear }} &bull; Printed: {{ now()->format('d M Y') }}
 </div>
 
 </body>

@@ -33,10 +33,12 @@ class User extends Authenticatable implements FilamentUser
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'last_login_at'     => 'datetime',
-            'is_active'         => 'boolean',
-            'password'          => 'hashed',
+            'email_verified_at'    => 'datetime',
+            'last_login_at'        => 'datetime',
+            'locked_until'         => 'datetime',
+            'is_active'            => 'boolean',
+            'must_change_password' => 'boolean',
+            'password'             => 'hashed',
         ];
     }
 
@@ -70,17 +72,13 @@ class User extends Authenticatable implements FilamentUser
         return $this->belongsTo(District::class);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Filament access ───────────────────────────────────────────────────────
 
-//    public function canAccessFilament(): bool
-//    {
-//        return $this->is_active;
-//    }
-
-    // Add this instead:
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->is_active && $this->hasAnyRole([
+        return $this->is_active
+            && ! $this->isLockedOut()
+            && $this->hasAnyRole([
                 'super_admin',
                 'accountant',
                 'secretariat',
@@ -88,8 +86,12 @@ class User extends Authenticatable implements FilamentUser
                 'church_coordinator',
                 'district_coordinator',
                 'camp_director',
+                'admin',   // new: edit-only admin
+                'media',   // new: media manager
             ]);
     }
+
+    // ── Role helpers ──────────────────────────────────────────────────────────
 
     public function isCampDirector(): bool
     {
@@ -106,8 +108,30 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasRole('church_coordinator');
     }
 
+    // ── Password helpers ──────────────────────────────────────────────────────
+
+    /** True when the user is locked out (brute-force protection). */
+    public function isLockedOut(): bool
+    {
+        return $this->locked_until && now()->lt($this->locked_until);
+    }
+
+    /** Clear the forced-password-change flag and temp password. */
+    public function clearTemporaryPassword(): void
+    {
+        $this->update([
+            'must_change_password' => false,
+            'temp_password'        => null,
+        ]);
+    }
+
+    // ── Scoped camper query ───────────────────────────────────────────────────
+
     /**
-     * Get camper query scoped to this user's access level.
+     * Returns a Camper query scoped to this user's access level.
+     * Church coordinators see only their church.
+     * District coordinators see all churches in their district.
+     * All other roles see everything.
      */
     public function scopedCamperQuery(): Builder
     {
@@ -122,6 +146,6 @@ class User extends Authenticatable implements FilamentUser
             return $query->whereIn('church_id', $churchIds);
         }
 
-        return $query; // super_admin, secretariat, camp_director — see all
+        return $query; // super_admin, secretariat, camp_director, accountant — see all
     }
 }

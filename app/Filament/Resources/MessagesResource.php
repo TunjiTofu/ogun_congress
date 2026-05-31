@@ -35,7 +35,7 @@ class MessagesResource extends Resource
     public static function canAccess(): bool
     {
         return auth()->user()->hasAnyRole([
-            'super_admin', 'camp_director', 'secretariat', 'accountant',
+            'super_admin', 'camp_director', 'secretariat', 'accountant', 'admin',
         ]);
     }
 
@@ -186,6 +186,16 @@ class MessagesResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([]); // read-only resource
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return ! auth()->user()->hasRole('admin');
+    }
+
+    public static function canDelete($record): bool
+    {
+        return ! auth()->user()->hasRole('admin');
     }
 
     public static function getPages(): array

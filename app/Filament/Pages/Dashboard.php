@@ -22,7 +22,7 @@ class Dashboard extends BaseDashboard
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'security']);
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'secretariat', 'security']);
     }
 
     public function getViewData(): array

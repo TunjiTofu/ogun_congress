@@ -10,13 +10,15 @@ use App\Filament\Pages\CoordinatorCampersPage;
 use App\Filament\Pages\CoordinatorCheckinTrailPage;
 use App\Filament\Pages\DistrictCoordinatorDashboard;
 use App\Filament\Pages\PhotoReviewPage;
+use App\Filament\Pages\ChangePassword;
+use App\Filament\Pages\ForceChangePassword;
 use App\Filament\Pages\RegistrationControlPage;
 use App\Filament\Pages\Reports;
 use App\Filament\Widgets\CategoryBreakdownWidget;
 use App\Filament\Widgets\RecentActivityWidget;
 use App\Filament\Widgets\RegistrationsByDayWidget;
 use App\Filament\Widgets\StatsOverviewWidget;
-use Filament\Http\Middleware\Authenticate;
+use App\Http\Middleware\Authenticate;  // custom — redirects to /admin/login, not route('login')
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
@@ -74,6 +76,8 @@ class AdminPanelProvider extends PanelProvider
                 CoordinatorCampersPage::class,
                 CampDirectorDashboard::class,
                 RegistrationControlPage::class,
+                ForceChangePassword::class,
+                ChangePassword::class,
             ])
             ->widgets([
                 StatsOverviewWidget::class,
@@ -94,8 +98,15 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                \App\Http\Middleware\ForcePasswordChange::class,
             ])
             ->maxContentWidth('full')
-            ->sidebarCollapsibleOnDesktop();
+            ->sidebarCollapsibleOnDesktop()
+            ->userMenuItems([
+                'change-password' => \Filament\Navigation\MenuItem::make()
+                    ->label('Change Password')
+                    ->icon('heroicon-o-key')
+                    ->url(fn () => ChangePassword::getUrl()),
+            ]);
     }
 }

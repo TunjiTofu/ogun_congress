@@ -27,7 +27,7 @@ class BulkRegistrationBatchResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['church_coordinator', 'accountant', 'super_admin']);
+        return auth()->user()->hasAnyRole(['church_coordinator', 'accountant', 'super_admin', 'admin']);
     }
 
     public static function form(Form $form): Form
@@ -490,6 +490,16 @@ class BulkRegistrationBatchResource extends Resource
         return [
             \App\Filament\Resources\BulkRegistrationBatchResource\RelationManagers\EntriesRelationManager::class,
         ];
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return ! auth()->user()->hasRole('admin');
+    }
+
+    public static function canDelete($record): bool
+    {
+        return ! auth()->user()->hasRole('admin');
     }
 
     public static function getPages(): array

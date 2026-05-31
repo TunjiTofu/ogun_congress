@@ -66,16 +66,23 @@
                 try {
                     const res  = await fetch('/api/v1/registration/downloads/{{ $camper->camper_number }}');
                     const data = await res.json();
+                    // Server tells us definitively whether consent is needed
+                    if (typeof data.needs_consent !== 'undefined') {
+                        this.needsConsent = data.needs_consent;
+                    }
                     if (data.status === 'ready') {
-                        this.urls      = data.urls;
+                        this.urls       = data.urls;
                         this.generating = false;
-                    } else if (this.polls < 8) {
+                    } else if (data.status === 'pending' && this.polls < 10) {
                         this.polls++;
-                        setTimeout(() => this.fetchUrls(), 5000);
+                        setTimeout(() => this.fetchUrls(), 4000);
                     } else {
                         this.generating = false;
                     }
-                } catch { this.generating = false; }
+                } catch (e) {
+                    console.error('fetchUrls error:', e);
+                    this.generating = false;
+                }
             }
          }"
              x-init="fetchUrls()">
@@ -83,26 +90,26 @@
             <h2 class="font-bold text-navy mb-4">Your Documents</h2>
 
             {{-- ID Card --}}
-            <div class="border border-gray-200 rounded-xl p-4 mb-3 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <span class="text-2xl">&#x1F4D7;</span>
-                    <div>
-                        <p class="font-semibold text-sm">Camper ID Card</p>
-                        <p class="text-xs text-gray-400">Print and bring to camp. Contains your QR code.</p>
-                    </div>
-                </div>
-                <div>
-                <span x-show="!urls.id_card && generating"
-                      class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">Generating&hellip;</span>
-                    <a x-show="urls.id_card" :href="urls.id_card" target="_blank"
-                       class="text-xs bg-navy text-white px-3 py-1.5 rounded-full hover:bg-blue-800 transition">
-                        Download PDF
-                    </a>
-                </div>
-            </div>
+{{--            <div class="border border-gray-200 rounded-xl p-4 mb-3 flex items-center justify-between">--}}
+{{--                <div class="flex items-center gap-3">--}}
+{{--                    <span class="text-2xl">&#x1F4D7;</span>--}}
+{{--                    <div>--}}
+{{--                        <p class="font-semibold text-sm">Camper ID Card</p>--}}
+{{--                        <p class="text-xs text-gray-400">Print and bring to camp. Contains your QR code.</p>--}}
+{{--                    </div>--}}
+{{--                </div>--}}
+{{--                <div>--}}
+{{--                <span x-show="!urls.id_card && generating"--}}
+{{--                      class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">Generating&hellip;</span>--}}
+{{--                    <a x-show="urls.id_card" :href="urls.id_card" target="_blank"--}}
+{{--                       class="text-xs bg-navy text-white px-3 py-1.5 rounded-full hover:bg-blue-800 transition">--}}
+{{--                        Download PDF--}}
+{{--                    </a>--}}
+{{--                </div>--}}
+{{--            </div>--}}
 
-            @if($camper->requiresConsentForm())
-                {{-- Consent Form --}}
+            {{-- Consent Form — driven by API needsConsent flag --}}
+            <div x-show="needsConsent">
                 <div class="border border-gray-200 rounded-xl p-4 mb-3 flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <span class="text-2xl">&#x1F4CB;</span>
@@ -112,20 +119,21 @@
                         </div>
                     </div>
                     <div>
-                <span x-show="!urls.consent_form && generating"
-                      class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">Generating&hellip;</span>
+                    <span x-show="!urls.consent_form && generating"
+                          class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">Generating&hellip;</span>
+                        <span x-show="!urls.consent_form && !generating"
+                              class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Not ready</span>
                         <a x-show="urls.consent_form" :href="urls.consent_form" target="_blank"
                            class="text-xs bg-navy text-white px-3 py-1.5 rounded-full hover:bg-blue-800 transition">
                             Download PDF
                         </a>
                     </div>
                 </div>
-
                 <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-xs text-red-700">
-                    &#9888; <strong>Important:</strong> You will not be admitted without a signed consent form.
+                    &#9888; <strong>Important:</strong> Your child will not be admitted without a signed consent form.
                     Print, sign, and present it at check-in.
                 </div>
-            @endif
+            </div>
 
             <button x-show="!allReady() && !generating" @click="fetchUrls()"
                     class="w-full mt-4 border border-navy text-navy font-semibold py-2 rounded-xl text-sm hover:bg-navy/5 transition">
@@ -140,10 +148,8 @@
         <div class="bg-navy text-white rounded-2xl p-6 text-sm space-y-2">
             <h3 class="font-bold text-gold">Before You Arrive</h3>
             <ul class="space-y-1 text-white/80">
-                <li>&#10003; Print and laminate your <strong>ID card</strong></li>
-                @if($camper->requiresConsentForm())
-                    <li>&#10003; Print, sign, and bring the <strong>consent form</strong></li>
-                @endif
+                <li>&#10003; Print and bring your <strong>ID card</strong></li>
+                <li x-show="needsConsent">&#10003; Print, sign, and bring the <strong>consent form</strong></li>
                 <li>&#10003; Camp begins: <strong>{{ setting('camp_dates', 'TBA') }}</strong></li>
                 <li>&#10003; Venue: <strong>{{ setting('camp_venue', 'TBA') }}</strong></li>
             </ul>

@@ -7,23 +7,80 @@ use App\Models\Church;
 use App\Models\District;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 class BulkIdCardController extends Controller
 {
-    // Department colors — must match DocumentGenerationService
+    private const CARDS_PER_PAGE  = 6;    // 2 col × 3 row on A4
+    private const CHUNK_SIZE      = 30;   // campers per PDF chunk (5 pages)
+    private const MEMORY_LIMIT    = '512M';
+
     private array $departmentColors = [
-        'pathfinder'   => '#2D7A3A',  // Green
-        'adventurer'   => '#1B3A8F',  // Navy Blue
-        'senior_youth' => '#875216',  // Gold
-//        'senior_youth' => '#C9A94D',  // Gold
+        'pathfinder'   => '#2D7A3A',
+        'adventurer'   => '#1B3A8F',
+        'senior_youth' => '#875216',
     ];
 
+    // ── Main export entry point ──────────────────────────────────────────────
     public function export(Request $request)
     {
-        if (! auth()->user()->hasRole('super_admin')) {
+        if (! auth()->user()->hasAnyRole(['super_admin', 'secretariat'])) {
             abort(403);
         }
 
+        $query = $this->buildQuery($request);
+        $total = $query->count();
+
+        if ($total === 0) {
+            abort(404, 'No campers match the selected filters.');
+        }
+
+        // For small batches (≤30) stream directly
+        if ($total <= self::CHUNK_SIZE) {
+            return $this->streamDirect($query->get(), $request);
+        }
+
+        // For large batches — dispatch a queue job and redirect to status page
+        $jobKey = $this->dispatchBulkJob($query->get(), $request, $total);
+
+        return redirect()->route('exports.id-cards.status', ['key' => $jobKey]);
+    }
+
+    // ── Status / download page for queued exports ────────────────────────────
+    public function status(Request $request)
+    {
+        $key  = $request->query('key');
+        $data = Cache::get("id_card_export:{$key}");
+
+        if (! $data) {
+            abort(404, 'Export not found or has expired.');
+        }
+
+        return view('exports.id-cards-status', compact('data', 'key'));
+    }
+
+    public function download(Request $request, string $key)
+    {
+        $data = Cache::get("id_card_export:{$key}");
+
+        if (! $data || $data['status'] !== 'done') {
+            abort(404, 'Export not ready or expired.');
+        }
+
+        $path = $data['path'];
+        if (! Storage::disk('local')->exists($path)) {
+            abort(404, 'File not found.');
+        }
+
+        return Storage::disk('local')->download($path, $data['filename']);
+    }
+
+    // ── Private helpers ──────────────────────────────────────────────────────
+
+    private function buildQuery(Request $request)
+    {
         $query = Camper::with(['media', 'church.district', 'campRole'])
             ->orderBy('church_id')
             ->orderBy('full_name');
@@ -36,101 +93,152 @@ class BulkIdCardController extends Controller
         if ($request->filled('category'))    $query->where('category', $request->category);
         if ($request->filled('club_rank'))   $query->where('club_rank', $request->club_rank);
 
-        $campers = $query->get();
+        return $query;
+    }
 
-        if ($campers->isEmpty()) {
-            abort(404, 'No campers match the selected filters.');
-        }
+    /**
+     * Stream a PDF directly for small batches.
+     * Raises memory limit for the duration of the request only.
+     */
+    private function streamDirect($campers, Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        ini_set('memory_limit', self::MEMORY_LIMIT);
 
         $logoBase64 = $this->encodeLogo();
+        $this->prepareCampers($campers, $logoBase64);
 
-        // Pre-encode per-camper data
-        $campers->each(function (Camper $c) {
-            $c->photo_base64 = $this->encodePhoto($c);
-            $c->qr_base64    = $this->encodeQr($c);
-
-            // Officials get wine (or role-specific) colour; others get department colour
-            if ($c->is_official && $c->campRole) {
-                $c->badge_color_computed = $c->campRole->color ?? '#722F37';
-                $c->official_role_label  = strtoupper($c->campRole->name);
-            } else {
-                $categoryValue           = $c->category?->value ?? 'senior_youth';
-                $c->badge_color_computed = $c->badge_color
-                    ?? $this->departmentColors[$categoryValue]
-                    ?? '#1B3A6B';
-                $c->official_role_label  = null;
-            }
-        });
-
-        // 2 columns × 3 rows = 6 cards per A4 page
-        $pages = $campers->chunk(6);
+        $pages = $campers->chunk(self::CARDS_PER_PAGE);
 
         $pdf = Pdf::loadView('pdf.bulk-id-cards', [
             'pages'      => $pages,
-            'campers'    => $campers,
+            'totalCards' => $campers->count(),
             'logoBase64' => $logoBase64,
             'campName'   => setting('camp_name', 'Ogun Youth Camp'),
             'campYear'   => now()->year,
         ])
             ->setPaper('a4', 'portrait')
             ->setOptions([
-                'dpi'                  => 150,
-                'isHtml5ParserEnabled' => true,
+                'dpi'                  => 96,   // lowered from 150 — saves ~40% memory
+                'isHtml5ParserEnabled' => false, // disable HTML5 parser — was causing the OOM
                 'isRemoteEnabled'      => false,
+                'isFontSubsettingEnabled' => true,
             ]);
 
+        $filename = $this->makeFilename($request);
+
+        return $pdf->download($filename);
+    }
+
+    /**
+     * For large exports: split into chunks, generate separate PDFs,
+     * merge with Ghostscript if available, otherwise zip them.
+     * Dispatches to queue.
+     */
+    private function dispatchBulkJob($campers, Request $request, int $total): string
+    {
+        $key = \Illuminate\Support\Str::uuid()->toString();
+
+        Cache::put("id_card_export:{$key}", [
+            'status'   => 'queued',
+            'total'    => $total,
+            'filename' => $this->makeFilename($request),
+            'queued_at'=> now()->toDateTimeString(),
+        ], now()->addHours(2));
+
+        \App\Jobs\GenerateBulkIdCardsJob::dispatch($campers->pluck('id'), $key, $this->makeFilename($request));
+
+        return $key;
+    }
+
+    private function prepareCampers($campers, string $logoBase64): void
+    {
+        $campers->each(function (Camper $c) {
+            $c->photo_base64 = $this->encodePhoto($c);
+            $c->qr_base64    = $this->encodeQr($c);
+
+            if ($c->is_official && $c->campRole) {
+                $c->badge_color_computed = $c->campRole->color ?? '#722F37';
+                $c->official_role_label  = strtoupper($c->campRole->name);
+            } else {
+                $val                     = $c->category?->value ?? 'senior_youth';
+                $c->badge_color_computed = $c->badge_color ?? $this->departmentColors[$val] ?? '#1B3A6B';
+                $c->official_role_label  = null;
+            }
+        });
+    }
+
+    private function makeFilename(Request $request): string
+    {
         $label = collect([
             $request->filled('district_id') ? District::find($request->district_id)?->name : null,
             $request->filled('church_id')   ? Church::find($request->church_id)?->name     : null,
             $request->filled('category')    ? $request->category : null,
         ])->filter()->join('-');
 
-        $filename = 'id-cards' . ($label ? '-' . str($label)->slug() : '') . '-' . now()->format('Y-m-d') . '.pdf';
+        return 'id-cards' . ($label ? '-' . str($label)->slug() : '') . '-' . now()->format('Y-m-d') . '.pdf';
+    }
 
-        return $pdf->download($filename);
+    private function encodeLogo(): string
+    {
+        $path = public_path('images/congress_logo.png');
+        if (! file_exists($path)) {
+            return '';
+        }
+        return 'data:image/png;base64,' . base64_encode(file_get_contents($path));
     }
 
     private function encodePhoto(Camper $c): ?string
     {
-        $media = $c->getFirstMedia('photo');
-        if (! $media) return null;
+        try {
+            $media = $c->getFirstMedia('photo');
+            if (! $media) {
+                return null;
+            }
 
-        $path = ($media->hasGeneratedConversion('thumb') && file_exists($media->getPath('thumb')))
-            ? $media->getPath('thumb')
-            : $media->getPath();
+            $path = ($media->hasGeneratedConversion('thumb') && file_exists($media->getPath('thumb')))
+                ? $media->getPath('thumb')
+                : $media->getPath();
 
-        if (! file_exists($path)) return null;
+            if (! file_exists($path)) {
+                return null;
+            }
 
-        $mime = mime_content_type($path) ?: 'image/jpeg';
-        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+            // Resize to thumbnail to save memory — 120×120 is plenty for a card
+            if (extension_loaded('gd')) {
+                $src  = imagecreatefromstring(file_get_contents($path));
+                if ($src) {
+                    $thumb = imagecreatetruecolor(120, 120);
+                    imagecopyresampled($thumb, $src, 0, 0, 0, 0, 120, 120, imagesx($src), imagesy($src));
+                    ob_start();
+                    imagejpeg($thumb, null, 80);
+                    $jpeg = ob_get_clean();
+                    imagedestroy($src);
+                    imagedestroy($thumb);
+                    return 'data:image/jpeg;base64,' . base64_encode($jpeg);
+                }
+            }
+
+            $mime = mime_content_type($path) ?: 'image/jpeg';
+            return "data:{$mime};base64," . base64_encode(file_get_contents($path));
+
+        } catch (\Throwable $e) {
+            Log::warning('id_card.photo_encode_failed', ['camper' => $c->id, 'error' => $e->getMessage()]);
+            return null;
+        }
     }
 
     private function encodeQr(Camper $c): ?string
     {
-        if (! $c->qr_code_path) return null;
+        try {
+            $qr = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')
+                ->size(120)
+                ->errorCorrection('M')
+                ->generate('OGN:' . $c->camper_number);
 
-        foreach ([
-                     storage_path('app/public/' . $c->qr_code_path),
-                     storage_path('app/' . $c->qr_code_path),
-                 ] as $path) {
-            if (file_exists($path)) {
-                return 'data:image/png;base64,' . base64_encode(file_get_contents($path));
-            }
+            return 'data:image/png;base64,' . base64_encode($qr);
+        } catch (\Throwable $e) {
+            Log::warning('id_card.qr_encode_failed', ['camper' => $c->id, 'error' => $e->getMessage()]);
+            return null;
         }
-        return null;
-    }
-
-    private function encodeLogo(): ?string
-    {
-        foreach ([
-                     public_path('images/congress_logo.png'),
-                     public_path('images/favicon.png'),
-                     public_path('images/logo.png'),
-                 ] as $path) {
-            if (file_exists($path)) {
-                return 'data:' . (mime_content_type($path) ?: 'image/png') . ';base64,' . base64_encode(file_get_contents($path));
-            }
-        }
-        return null;
     }
 }

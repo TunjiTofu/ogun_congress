@@ -20,7 +20,7 @@ class CampRoleResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasRole('super_admin');
+        return auth()->user()->hasAnyRole(['super_admin', 'admin']);
     }
 
     public static function form(Form $form): Form
@@ -80,6 +80,16 @@ class CampRoleResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return ! auth()->user()->hasRole('admin');
+    }
+
+    public static function canDelete($record): bool
+    {
+        return ! auth()->user()->hasRole('admin');
     }
 
     public static function getPages(): array

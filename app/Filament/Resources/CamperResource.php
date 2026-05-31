@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Enums\CamperCategory;
 use App\Enums\Gender;
 use App\Filament\Resources\CamperResource\Pages;
+use App\Filament\Resources\CamperResource\RelationManagers\CheckinEventsRelationManager;
+use App\Filament\Resources\CamperResource\RelationManagers\ContactsRelationManager;
 use App\Models\Camper;
 use App\Models\Church;
 use App\Models\District;
@@ -30,7 +32,7 @@ class CamperResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'camp_director']);
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'secretariat', 'camp_director']);
     }
 
     public static function getEloquentQuery(): Builder
@@ -635,9 +637,19 @@ class CamperResource extends Resource
     public static function getRelationManagers(): array
     {
         return [
-            \App\Filament\Resources\CamperResource\RelationManagers\ContactsRelationManager::class,
-            \App\Filament\Resources\CamperResource\RelationManagers\CheckinEventsRelationManager::class,
+            ContactsRelationManager::class,
+            CheckinEventsRelationManager::class,
         ];
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return ! auth()->user()->hasRole('admin');
+    }
+
+    public static function canDelete($record): bool
+    {
+        return ! auth()->user()->hasRole('admin');
     }
 
     public static function getPages(): array
