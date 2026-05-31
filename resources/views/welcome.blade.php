@@ -260,58 +260,62 @@
 {{--            </div>--}}
 
             @if($regOpen && $regCloses)
-{{--                <div class="hero-deadline">--}}
-{{--                    <div class="hero-deadline-pulse"><span></span></div>--}}
-{{--                    <div class="hero-deadline-lbl">--}}
-{{--                        <span class="hero-deadline-eyebrow">Registration closes</span>--}}
-{{--                        <span class="hero-deadline-sub">{{ Carbon::parse($regCloses)->format('d M Y · H:i') }} WAT</span>--}}
-{{--                    </div>--}}
-{{--                    <div class="hero-deadline-cd">--}}
-{{--                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-d">--</span><span class="hdcd-lbl">d</span></div>--}}
-{{--                        <span class="hdcd-sep">:</span>--}}
-{{--                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-h">--</span><span class="hdcd-lbl">h</span></div>--}}
-{{--                        <span class="hdcd-sep">:</span>--}}
-{{--                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-m">--</span><span class="hdcd-lbl">m</span></div>--}}
-{{--                        <span class="hdcd-sep">:</span>--}}
-{{--                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-s">--</span><span class="hdcd-lbl">s</span></div>--}}
-{{--                    </div>--}}
-{{--                </div>--}}
-
                 <div class="hero-deadline">
                     <div class="hero-deadline-pulse"><span></span></div>
                     <div class="hero-deadline-lbl">
                         <span class="hero-deadline-eyebrow">Registration closes</span>
                         <span class="hero-deadline-sub">{{ Carbon::parse($regCloses)->format('d M Y · H:i') }} WAT</span>
                     </div>
-
                     <div class="hero-deadline-cd">
                         <div class="hdcd-cell">
-                            <span class="hdcd-num" id="rd-d" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>
-                            <span class="hdcd-lbl">Days</span>
-                        </div>
-
+                            <span class="hdcd-num" id="rd-d" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span><span class="hdcd-lbl">d</span></div>
                         <span class="hdcd-sep">:</span>
-
                         <div class="hdcd-cell">
-                            <span class="hdcd-num" id="rd-h" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>
-                            <span class="hdcd-lbl">Hours</span>
-                        </div>
-
+                            <span class="hdcd-num" id="rd-h" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span><span class="hdcd-lbl">h</span></div>
                         <span class="hdcd-sep">:</span>
-
                         <div class="hdcd-cell">
-                            <span class="hdcd-num" id="rd-m" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>
-                            <span class="hdcd-lbl">Minutes</span>
-                        </div>
-
+                            <span class="hdcd-num" id="rd-m" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span><span class="hdcd-lbl">m</span></div>
                         <span class="hdcd-sep">:</span>
-
                         <div class="hdcd-cell">
-                            <span class="hdcd-num" id="rd-s">--</span>
-                            <span class="hdcd-lbl">Seconds</span>
-                        </div>
+                            <span class="hdcd-num" id="rd-s" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span><span class="hdcd-lbl">s</span></div>
                     </div>
                 </div>
+
+{{--                <div class="hero-deadline">--}}
+{{--                    <div class="hero-deadline-pulse"><span></span></div>--}}
+{{--                    <div class="hero-deadline-lbl">--}}
+{{--                        <span class="hero-deadline-eyebrow">Registration closes</span>--}}
+{{--                        <span class="hero-deadline-sub">{{ Carbon::parse($regCloses)->format('d M Y · H:i') }} WAT</span>--}}
+{{--                    </div>--}}
+
+{{--                    <div class="hero-deadline-cd">--}}
+{{--                        <div class="hdcd-cell">--}}
+{{--                            <span class="hdcd-num" id="rd-d" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
+{{--                            <span class="hdcd-lbl">D</span>--}}
+{{--                        </div>--}}
+
+{{--                        <span class="hdcd-sep">:</span>--}}
+
+{{--                        <div class="hdcd-cell">--}}
+{{--                            <span class="hdcd-num" id="rd-h" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
+{{--                            <span class="hdcd-lbl">H</span>--}}
+{{--                        </div>--}}
+
+{{--                        <span class="hdcd-sep">:</span>--}}
+
+{{--                        <div class="hdcd-cell">--}}
+{{--                            <span class="hdcd-num" id="rd-m" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
+{{--                            <span class="hdcd-lbl">M</span>--}}
+{{--                        </div>--}}
+
+{{--                        <span class="hdcd-sep">:</span>--}}
+
+{{--                        <div class="hdcd-cell">--}}
+{{--                            <span class="hdcd-num" id="rd-s">--</span>--}}
+{{--                            <span class="hdcd-lbl">S</span>--}}
+{{--                        </div>--}}
+{{--                    </div>--}}
+{{--                </div>--}}
             @endif
 
             <h1 class="hero-title">From the Word<br/><em>to the World</em></h1>
