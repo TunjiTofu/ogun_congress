@@ -14,9 +14,11 @@ class RolesSeeder extends Seeder
             'accountant',
             'secretariat',
             'security',
-            'church_coordinator', // Bulk registration for local churches
-            'camp_director',       // NEW: read-only across entire system
-            'district_coordinator', // NEW: read-only scoped to their district
+            'church_coordinator',
+            'district_coordinator',
+            'camp_director',
+            'admin',
+            'media',
         ];
 
         foreach ($roles as $role) {

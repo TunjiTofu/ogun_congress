@@ -19,7 +19,7 @@ class YoutubeHighlightResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'camp_director']);
+        return auth()->user()->hasAnyRole(['super_admin', 'camp_director', 'admin', 'media']);
     }
 
     public static function form(Form $form): Form
@@ -134,6 +134,15 @@ class YoutubeHighlightResource extends Resource
                         ->action(fn ($records) => $records->each->update(['is_active' => false])),
                 ]),
             ]);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()->hasAnyRole(['super_admin', 'camp_director']);
+    }
+    public static function canDelete($record): bool
+    {
+        return auth()->user()->hasAnyRole(['super_admin', 'camp_director']);
     }
 
     public static function getPages(): array

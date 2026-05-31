@@ -27,6 +27,7 @@ class SubmitRegistrationRequest extends FormRequest
             'gender'                => ['required', new Enum(Gender::class)],
             'home_address'          => ['nullable', 'string', 'max:500'],
             'photo'                 => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'photo_data_url'        => ['nullable', 'string'], // base64 data URL from live camera
 
             // Step 2 — Church & Ministry
             'church_id'             => ['nullable', 'integer', 'exists:churches,id'],

@@ -94,7 +94,7 @@
         .hero-left{max-width:600px}
         .hero-eyebrow{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(184,146,74,.25);padding:7px 16px;border-radius:100px;font-size:12px;font-weight:500;color:rgba(255,255,255,.85);letter-spacing:.04em;backdrop-filter:blur(10px);margin-bottom:32px}
         .hero-eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--gold-2);box-shadow:0 0 12px rgba(212,178,110,.6)}
-        .hero-deadline{background:rgba(184,146,74,.08);border:1px solid rgba(184,146,74,.2);border-radius:var(--r);padding:14px 20px;margin-bottom:28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+        .hero-deadline{background:rgba(184,146,74,.08); height:120px; border:1px solid rgba(184,146,74,.2);border-radius:var(--r);padding:14px 20px;margin-bottom:28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
         .hero-deadline-pulse span{display:block;width:8px;height:8px;border-radius:50%;background:var(--gold);animation:pulse 2s infinite}
         .hero-deadline-eyebrow{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-2);margin-bottom:2px}
         .hero-deadline-sub{font-size:12px;color:rgba(255,255,255,.6)}
@@ -163,13 +163,33 @@
 
 @include('partials.welcome-banner')
 
+@php
+    $baseUrl = rtrim(config('app.url'), '/');
+
+    if (app()->environment('local')) {
+        $port = env('APP_PORT');
+
+        if ($port) {
+            $parts = parse_url($baseUrl);
+
+            $scheme = $parts['scheme'] ?? 'http';
+            $host   = $parts['host'] ?? $baseUrl;
+
+            $baseUrl = "{$scheme}://{$host}:{$port}";
+        }
+    }
+@endphp
+
 <!-- ── TOPBAR ─────────────────────────────────────────────────────────────── -->
 <div class="topbar">
     <div class="topbar-inner">
         @if($regOpen)
             <span class="topbar-dot" style="background:#5ED48A;box-shadow:0 0 0 3px rgba(94,212,138,.18)"></span>
             {{ setting('camp_name','Ogun Conference Youth Congress 2026') }}
-            &mdash; {{ setting('camp_venue','Abeokuta') }} &middot; {{ setting('camp_dates','Aug 16–22, 2026') }}
+{{--            &mdash;--}}
+{{--            {{ setting('camp_venue','Abeokuta') }} --}}
+            &middot;
+            {{ setting('camp_dates','Aug 16–22, 2026') }}
             @if($regCloses)
                 <span class="topbar-sep">|</span>
                 Registration closes <strong>{{ Carbon::parse($regCloses)->format('d M Y') }}</strong>
@@ -234,26 +254,62 @@
     </div>
     <div class="hero-container">
         <div class="hero-left">
-            <div class="hero-eyebrow">
-                <span class="hero-eyebrow-dot"></span>
-                {{ setting('camp_venue','Abeokuta') }} 2026 &nbsp;&bull;&nbsp; {{ setting('camp_dates','August 16–22') }}
-            </div>
+{{--            <div class="hero-eyebrow">--}}
+{{--                <span class="hero-eyebrow-dot"></span>--}}
+{{--                {{ setting('camp_venue','Abeokuta') }} 2026 &nbsp;&bull;&nbsp; {{ setting('camp_dates','August 16–22') }}--}}
+{{--            </div>--}}
 
             @if($regOpen && $regCloses)
+{{--                <div class="hero-deadline">--}}
+{{--                    <div class="hero-deadline-pulse"><span></span></div>--}}
+{{--                    <div class="hero-deadline-lbl">--}}
+{{--                        <span class="hero-deadline-eyebrow">Registration closes</span>--}}
+{{--                        <span class="hero-deadline-sub">{{ Carbon::parse($regCloses)->format('d M Y · H:i') }} WAT</span>--}}
+{{--                    </div>--}}
+{{--                    <div class="hero-deadline-cd">--}}
+{{--                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-d">--</span><span class="hdcd-lbl">d</span></div>--}}
+{{--                        <span class="hdcd-sep">:</span>--}}
+{{--                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-h">--</span><span class="hdcd-lbl">h</span></div>--}}
+{{--                        <span class="hdcd-sep">:</span>--}}
+{{--                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-m">--</span><span class="hdcd-lbl">m</span></div>--}}
+{{--                        <span class="hdcd-sep">:</span>--}}
+{{--                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-s">--</span><span class="hdcd-lbl">s</span></div>--}}
+{{--                    </div>--}}
+{{--                </div>--}}
+
                 <div class="hero-deadline">
                     <div class="hero-deadline-pulse"><span></span></div>
                     <div class="hero-deadline-lbl">
                         <span class="hero-deadline-eyebrow">Registration closes</span>
                         <span class="hero-deadline-sub">{{ Carbon::parse($regCloses)->format('d M Y · H:i') }} WAT</span>
                     </div>
+
                     <div class="hero-deadline-cd">
-                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-d">--</span><span class="hdcd-lbl">d</span></div>
+                        <div class="hdcd-cell">
+                            <span class="hdcd-num" id="rd-d" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>
+                            <span class="hdcd-lbl">Days</span>
+                        </div>
+
                         <span class="hdcd-sep">:</span>
-                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-h">--</span><span class="hdcd-lbl">h</span></div>
+
+                        <div class="hdcd-cell">
+                            <span class="hdcd-num" id="rd-h" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>
+                            <span class="hdcd-lbl">Hours</span>
+                        </div>
+
                         <span class="hdcd-sep">:</span>
-                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-m">--</span><span class="hdcd-lbl">m</span></div>
+
+                        <div class="hdcd-cell">
+                            <span class="hdcd-num" id="rd-m" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>
+                            <span class="hdcd-lbl">Minutes</span>
+                        </div>
+
                         <span class="hdcd-sep">:</span>
-                        <div class="hdcd-cell"><span class="hdcd-num" id="rd-s">--</span><span class="hdcd-lbl">s</span></div>
+
+                        <div class="hdcd-cell">
+                            <span class="hdcd-num" id="rd-s">--</span>
+                            <span class="hdcd-lbl">Seconds</span>
+                        </div>
                     </div>
                 </div>
             @endif
@@ -292,8 +348,8 @@
                         <div class="hero-card-meta">Ogun State</div>
                     </div>
                     <div class="hero-card-item">
-                        <div class="hero-card-lbl">Departments</div>
-                        <div class="hero-card-val">3</div>
+                        <div class="hero-card-lbl">Open to</div>
+                        <div class="hero-card-val">Ages 6 +</div>
                         <div class="hero-card-meta">Adv &middot; PF &middot; SYL</div>
                     </div>
                     <div class="hero-card-item">
@@ -341,7 +397,7 @@
         <div class="section-head section-head-center reveal">
             <div class="eyebrow eyebrow-center"><span class="eyebrow-dot"></span>&nbsp; Your Gateway</div>
             <h2 class="section-title">Already have a code?<br/><em>Start where you are.</em></h2>
-            <p class="section-lede" style="margin:0 auto">Codes are issued by your local church coordinator after payment. Use the left card to complete your registration; use the right card to log into your camper portal.</p>
+            <p class="section-lede" style="margin:0 auto">Access codes are issued by your Local Church Youth Leader upon confirmation of payment. Use the card on the left to complete your registration and the card on the right to access your camper portal.</p>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:980px;margin:0 auto">
             <div style="background:#fff;border:1px solid var(--hairline);border-radius:var(--r-lg);padding:36px;box-shadow:var(--sh-2)" class="reveal reveal-delay-1">
@@ -397,7 +453,7 @@
                 <div class="eyebrow"><span class="eyebrow-dot"></span>&nbsp; Registration</div>
                 <h2 class="section-title">Four steps,<br/><em>one church-led process.</em></h2>
             </div>
-            <p class="section-lede">Registration runs through your local church. Your coordinator handles payment and code generation for the whole congregation — then you finish the form with your code.</p>
+            <p class="section-lede">Registration runs through your local church. Your youth leader handles payment and code generation for the whole congregation — then you finish the form with your code.</p>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:64px">
@@ -434,8 +490,8 @@
                     <div><div style="font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px">Bank</div><div style="font-size:15px;font-weight:500;color:#fff">{{ setting('bank_name') }}</div></div>
                     <div><div style="font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px">Account Number</div><div style="font-family:var(--font-mono);font-size:20px;font-weight:600;color:var(--gold-2);letter-spacing:.04em">{{ setting('bank_account_number') }}</div></div>
                     <div><div style="font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px">Account Name</div><div style="font-size:15px;font-weight:500;color:#fff">{{ setting('bank_account_name') }}</div></div>
-                    @if(setting('whatsapp_number'))
-                        <div><a href="https://wa.me/{{ preg_replace('/\D/','',setting('whatsapp_number')) }}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--gold);color:var(--ink);font-size:13px;font-weight:600;padding:11px 18px;border-radius:100px;text-decoration:none">Send Teller &rarr;</a></div>
+                    @if(setting('treasurer_number'))
+                        <div><a href="https://wa.me/{{ preg_replace('/\D/','',setting('treasurer_number')) }}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--gold);color:var(--ink);font-size:13px;font-weight:600;padding:11px 18px;border-radius:100px;text-decoration:none">Send Teller &rarr;</a></div>
                     @endif
                 </div>
             </div>
@@ -451,7 +507,7 @@
                 <div class="eyebrow"><span class="eyebrow-dot"></span>&nbsp; Departments</div>
                 <h2 class="section-title">Pick the camp<br/><em>that fits your age.</em></h2>
             </div>
-            <p class="section-lede">Every camper belongs to one of three departments. Fees, age brackets, and uniforms differ — but the table, the chapel, and the call are the same.</p>
+            <p class="section-lede">Every camper belongs to one of three departments. Fees, age brackets, and uniforms differ — but the call are the same.</p>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-bottom:32px">
@@ -589,7 +645,7 @@
                 <div class="eyebrow"><span class="eyebrow-dot"></span>&nbsp; Highlights · Youth Channel</div>
                 <h2 class="section-title">Witness the week,<br/><em>before · during · after.</em></h2>
             </div>
-            <p class="section-lede">A short film series from past Congresses and field reports from our missionary tracks. Tap any thumbnail to play here, or open the full channel on YouTube.</p>
+            <p class="section-lede">Tap any thumbnail to play here, or open the full channel on YouTube.</p>
         </div>
 
         @if($highlights->count())
@@ -699,7 +755,7 @@
                 <div class="eyebrow"><span class="eyebrow-dot"></span>&nbsp; Guidelines</div>
                 <h2 class="section-title">Camp rules,<br/><em>kept simple.</em></h2>
             </div>
-            <p class="section-lede" style="align-self:end">Six commitments every camper signs onto. Coordinators will review these with each registrant before camp.</p>
+            <p class="section-lede" style="align-self:end">Commitments every camper signs onto. Coordinators will review these with each registrant before camp.</p>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:var(--r-lg);overflow:hidden">
             @foreach([['01','All campers must carry their <strong>printed ID card</strong> at all times during camp.'],['02','Campers under 18 must submit a <strong>signed parental consent form</strong> at check-in.'],['03','Participants must wear the <strong>official camp uniform/dress code</strong> during formal sessions.'],['04','Mobile phones should be kept on <strong>silent mode</strong> during services and meetings.'],['05','No camper may <strong>leave the camp venue</strong> without prior permission from officials.'],['06','All campers are expected to <strong>participate respectfully</strong> in all programme activities.']] as [$no,$text])
@@ -721,24 +777,40 @@
                 <h2 class="section-title">Questions?<br/><em>We're listening.</em></h2>
                 <p class="section-lede" style="max-width:100%">For enquiries, complaints, or payment questions — reach us through any of the channels below, or send a message and we'll respond within 24 hours.</p>
                 <div style="display:flex;flex-direction:column;gap:10px;margin-top:36px">
-                    @if(setting('whatsapp_number'))
+                    @if(setting('treasurer_number'))
                         <a href="https://wa.me/{{ preg_replace('/\D/','',setting('whatsapp_number')) }}" target="_blank" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">
                             <div style="width:44px;height:44px;border-radius:12px;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#128172;</div>
-                            <div style="flex:1"><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">WhatsApp</div><div style="font-size:13px;color:var(--text-2)">{{ setting('whatsapp_number') }}</div></div>
+                            <div style="flex:1"><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Treasurer</div><div style="font-size:13px;color:var(--text-2)">{{ setting('treasurer_number') }}</div></div>
                             <span style="font-size:16px;color:var(--muted)">&nearr;</span>
                         </a>
                     @endif
+
                     @if(setting('secretariat_phone'))
-                        <a href="tel:{{ setting('secretariat_phone') }}" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">
-                            <div style="width:44px;height:44px;border-radius:12px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#128222;</div>
+                        <a href="https://wa.me/{{ preg_replace('/\D/','',setting('secretariat_phone')) }}" target="_blank" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">
+                            <div style="width:44px;height:44px;border-radius:12px;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#128172;</div>
                             <div style="flex:1"><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Secretariat</div><div style="font-size:13px;color:var(--text-2)">{{ setting('secretariat_phone') }}</div></div>
                             <span style="font-size:16px;color:var(--muted)">&nearr;</span>
                         </a>
                     @endif
-                    <div style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px">
-                        <div style="width:44px;height:44px;border-radius:12px;background:var(--gold-soft);color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#127776;</div>
-                        <div><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Seventh-day Adventist</div><div style="font-size:13px;color:var(--text-2)">Ogun Conference Youth Department</div></div>
-                    </div>
+
+                    @if(setting('whatsapp_number'))
+                        <a href="https://wa.me/{{ preg_replace('/\D/','',setting('whatsapp_number')) }}" target="_blank" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">
+                            <div style="width:44px;height:44px;border-radius:12px;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#128172;</div>
+                            <div style="flex:1"><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Technical Support</div><div style="font-size:13px;color:var(--text-2)">{{ setting('whatsapp_number') }}</div></div>
+                            <span style="font-size:16px;color:var(--muted)">&nearr;</span>
+                        </a>
+                    @endif
+{{--                    @if(setting('secretariat_phone'))--}}
+{{--                        <a href="tel:{{ setting('secretariat_phone') }}" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">--}}
+{{--                            <div style="width:44px;height:44px;border-radius:12px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#128222;</div>--}}
+{{--                            <div style="flex:1"><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Secretariat</div><div style="font-size:13px;color:var(--text-2)">{{ setting('secretariat_phone') }}</div></div>--}}
+{{--                            <span style="font-size:16px;color:var(--muted)">&nearr;</span>--}}
+{{--                        </a>--}}
+{{--                    @endif--}}
+{{--                    <div style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px">--}}
+{{--                        <div style="width:44px;height:44px;border-radius:12px;background:var(--gold-soft);color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#127776;</div>--}}
+{{--                        <div><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Seventh-day Adventist</div><div style="font-size:13px;color:var(--text-2)">Ogun Conference Youth Department</div></div>--}}
+{{--                    </div>--}}
                 </div>
             </div>
 
@@ -766,11 +838,17 @@
                     </div>
                     <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:18px">
                         <label style="font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--text-2)">Category *</label>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px">
+                        <div style="display:flex;flex-wrap:wrap;gap:8px" id="contact-cats">
                             @foreach(['general'=>'General Enquiry','complaint'=>'Complaint','inquiry'=>'Inquiry','payment'=>'Payment Question'] as $val=>$lbl)
-                                <label style="cursor:pointer;position:relative">
+                                <label style="cursor:pointer" onclick="selectCat(this)">
                                     <input type="radio" name="category" value="{{ $val }}" {{ old('category')===$val?'checked':'' }} required style="position:absolute;opacity:0;pointer-events:none"/>
-                                    <span style="display:inline-block;padding:9px 16px;background:#fff;border:1px solid var(--hairline-2);border-radius:100px;font-size:13px;font-weight:500;color:var(--text-2);transition:all .2s">{{ $lbl }}</span>
+                                    <span class="cat-pill {{ old('category')===$val ? 'cat-pill-active' : '' }}"
+                                          style="display:inline-block;padding:9px 16px;border-radius:100px;font-size:13px;font-weight:500;transition:all .2s;cursor:pointer;
+                                             {{ old('category')===$val
+                                                ? 'background:var(--ink);color:#fff;border:1px solid var(--ink)'
+                                                : 'background:#fff;color:var(--text-2);border:1px solid var(--hairline-2)' }}">
+                                    {{ $lbl }}
+                                </span>
                                 </label>
                             @endforeach
                         </div>
@@ -805,6 +883,7 @@
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:32px;margin-bottom:56px">
             <div style="display:flex;flex-direction:column;gap:12px">
                 <div style="font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-2);margin-bottom:4px">Navigate</div>
+                <a href="{{ $baseUrl . '/admin/login' }}" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px;transition:color .2s,padding-left .25s" target="_blank">Admin Dashboard</a>
                 <a href="#register" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px;transition:color .2s,padding-left .25s">How to Register</a>
                 <a href="#fees" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px">Departments &amp; Fees</a>
                 @if($campActive)<a href="#programs" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px">Programmes</a>@endif
@@ -820,8 +899,9 @@
             </div>
             <div style="display:flex;flex-direction:column;gap:12px">
                 <div style="font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-2);margin-bottom:4px">Reach us</div>
-                @if(setting('whatsapp_number'))<a href="https://wa.me/{{ preg_replace('/\D/','',setting('whatsapp_number')) }}" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px">WhatsApp</a>@endif
-                @if(setting('secretariat_phone'))<a href="tel:{{ setting('secretariat_phone') }}" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px">Secretariat</a>@endif
+                @if(setting('treasurer_number'))<a href="https://wa.me/{{ preg_replace('/\D/','',setting('treasurer_number')) }}" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px">Treasurer</a>@endif
+                @if(setting('secretariat_phone'))<a href="https://wa.me/{{ preg_replace('/\D/','',setting('secretariat_phone')) }}" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px">Secretariat</a>@endif
+                @if(setting('whatsapp_number'))<a href="https://wa.me/{{ preg_replace('/\D/','',setting('whatsapp_number')) }}" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px">Technical Support</a>@endif
                 <a href="#contact" style="color:rgba(255,255,255,.65);text-decoration:none;font-size:13.5px">Send a message</a>
             </div>
             <div style="display:flex;flex-direction:column;gap:12px">
@@ -835,7 +915,7 @@
                 <span style="color:var(--gold);font-size:14px">&#10022;</span>
                 <span>Seventh-day Adventist Church &mdash; Ogun Conference Youth Department &middot; {{ now()->year }}</span>
             </div>
-            <div>Designed &amp; Developed by <a href="tel:2348163513389" style="color:var(--gold-2);text-decoration:none">Gratus Technologies</a></div>
+            <div>Designed &amp; Developed by <a href="https://wa.me/{{ preg_replace('/\D/','',setting('whatsapp_number')) }}" style="color:var(--gold-2);text-decoration:none">Gratus Technologies &middot; 2348163513389</a></div>
         </div>
     </div>
 </footer>
@@ -974,6 +1054,28 @@
         paint(0);
     })();
     @endif
+
+    /* ── Contact category pill selection ── */
+    function selectCat(label) {
+        document.querySelectorAll('#contact-cats .cat-pill').forEach(function(pill) {
+            pill.style.background  = '#fff';
+            pill.style.color       = 'var(--text-2)';
+            pill.style.border      = '1px solid var(--hairline-2)';
+        });
+        var pill = label.querySelector('.cat-pill');
+        if (pill) {
+            pill.style.background = 'var(--ink)';
+            pill.style.color      = '#fff';
+            pill.style.border     = '1px solid var(--ink)';
+        }
+        var radio = label.querySelector('input[type=radio]');
+        if (radio) radio.checked = true;
+    }
+    // Restore selected state on page load (e.g. after validation failure)
+    document.addEventListener('DOMContentLoaded', function() {
+        var checked = document.querySelector('#contact-cats input[type=radio]:checked');
+        if (checked) selectCat(checked.closest('label'));
+    });
 </script>
 </body>
 </html>

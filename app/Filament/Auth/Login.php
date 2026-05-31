@@ -47,6 +47,19 @@ class Login extends BaseLogin
             Cache::forget($lockKey);
         }
 
+
+        // -- 3b. Manual block check (admin-imposed via UserResource) ----------
+        $targetUser = User::where('email', $email)->first();
+        if ($targetUser && $targetUser->isLockedOut()) {
+            $until   = $targetUser->locked_until;
+            $minutes = now()->diffInMinutes($until, false);
+            $msg = $minutes > 1440
+                ? 'Your account has been locked by an administrator. Please contact IT Support.'
+                : 'Your account is locked until ' . $until->format('d M Y H:i') . '. Contact the IT Support if this is an error.';
+            Log::warning('auth.admin_blocked', ['email' => $email, 'ip' => $ip]);
+            throw ValidationException::withMessages(['data.email' => $msg]);
+        }
+
         // ── 3. Attempt authentication ─────────────────────────────────────
         try {
             $response = parent::authenticate();
@@ -69,7 +82,7 @@ class Login extends BaseLogin
             }
 
             $remaining = self::MAX_ATTEMPTS - $attempts;
-            Log::warning('auth.failed', ['email' => $email, 'ip' => $ip, 'attempts' => $attempts, 'remaining' => $remaining]);
+            Log::info('auth.failed', ['email' => $email, 'ip' => $ip, 'attempts' => $attempts, 'remaining' => $remaining]);
 
             throw ValidationException::withMessages([
                 'data.email' => ($e->errors()['data.email'][0] ?? 'These credentials do not match our records.')
@@ -77,7 +90,7 @@ class Login extends BaseLogin
             ]);
         }
 
-        // ── 4. Successful login — clear rate limit, record metadata ───────
+        // ── 5. Successful login — clear rate limit, record metadata ───────
         Cache::forget($attemptKey);
         Cache::forget($lockKey);
 

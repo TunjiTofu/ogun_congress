@@ -25,7 +25,27 @@ class Camper extends Model implements HasMedia
 
     use HasFactory;
 
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'registration_code_id',
+        'camper_number',
+        'full_name',
+        'phone',
+        'date_of_birth',
+        'gender',
+        'category',
+        'home_address',
+        'church_id',
+        'ministry',
+        'club_rank',
+        'volunteer_role',
+        'photo_path',
+        'badge_color',
+        'id_card_path',
+        'consent_form_path',
+        'consent_collected',
+        'photo_status',
+        'photo_rejection_reason',
+    ];
 
     protected function casts(): array
     {
@@ -34,7 +54,6 @@ class Camper extends Model implements HasMedia
             'gender'            => Gender::class,
             'category'          => CamperCategory::class,
             'consent_collected' => 'boolean',
-            'is_official' => 'boolean',
         ];
     }
 
@@ -97,7 +116,7 @@ class Camper extends Model implements HasMedia
 
     public function campRole(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\CampRole::class);
+        return $this->belongsTo(CampRole::class);
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────
@@ -136,13 +155,18 @@ class Camper extends Model implements HasMedia
 
     public function requiresConsentForm(): bool
     {
-        // If DOB is unknown, use category — Adventurers and Pathfinders are always under 18
+        // Normalise category — may be an Enum instance or a plain string
+        $cat = $this->category instanceof \App\Enums\CamperCategory
+            ? $this->category->value
+            : (string) $this->category;
+
+        // If DOB is missing, fall back to category
+        // Adventurers (6-9) and Pathfinders (10-15) are always under 18
         if (! $this->date_of_birth) {
-            return in_array($this->category, [
-                \App\Enums\CamperCategory::ADVENTURER,
-                \App\Enums\CamperCategory::PATHFINDER,
-            ]);
+            return in_array($cat, ['adventurer', 'pathfinder']);
         }
+
+        // If DOB is set, use actual age
         return $this->age < 18;
     }
 
@@ -151,27 +175,5 @@ class Camper extends Model implements HasMedia
         return $this->checkinEvents()
             ->where('event_type', \App\Enums\CheckinEventType::CHECK_IN)
             ->exists();
-    }
-
-    /**
-     * Add a computed is_checked_in boolean based on the last check-in event.
-     */
-    public function scopeWithLastCheckinStatus(Builder $query): void
-    {
-        $query->addSelect([
-            'is_checked_in' => \App\Models\CheckinEvent::select('event_type')
-                ->whereColumn('camper_id', 'campers.id')
-                ->latest('occurred_at')
-                ->limit(1),
-        ])->selectRaw("
-            CASE
-                WHEN (
-                    SELECT event_type FROM checkin_events
-                    WHERE camper_id = campers.id
-                    ORDER BY occurred_at DESC LIMIT 1
-                ) = 'check_in' THEN 1
-                ELSE 0
-            END as is_checked_in
-        ");
     }
 }

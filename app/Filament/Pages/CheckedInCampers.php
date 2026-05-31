@@ -25,7 +25,7 @@ class CheckedInCampers extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'camp_director']);
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'secretariat', 'camp_director']);
     }
 
     protected function getHeaderActions(): array

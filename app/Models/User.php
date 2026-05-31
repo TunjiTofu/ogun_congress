@@ -76,7 +76,9 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->is_active && $this->hasAnyRole([
+        return $this->is_active
+            && ! $this->isLockedOut()
+            && $this->hasAnyRole([
                 'super_admin',
                 'accountant',
                 'secretariat',
@@ -84,6 +86,8 @@ class User extends Authenticatable implements FilamentUser
                 'church_coordinator',
                 'district_coordinator',
                 'camp_director',
+                'admin',   // new: edit-only admin
+                'media',   // new: media manager
             ]);
     }
 

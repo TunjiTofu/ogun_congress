@@ -22,7 +22,7 @@ class CampMediaResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'secretariat']);
+        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'admin', 'media']);
     }
 
     public static function form(Form $form): Form
@@ -205,6 +205,15 @@ class CampMediaResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()->hasAnyRole(['super_admin', 'secretariat']);
+    }
+    public static function canDelete($record): bool
+    {
+        return auth()->user()->hasAnyRole(['super_admin', 'secretariat']);
     }
 
     public static function getPages(): array

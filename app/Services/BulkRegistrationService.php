@@ -11,7 +11,10 @@ use App\Models\BulkRegistrationEntry;
 use App\Models\RegistrationCode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use App\Mail\BulkBatchSubmittedMail;
+use App\Models\User;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class BulkRegistrationService
 {
@@ -150,6 +153,25 @@ class BulkRegistrationService
             'batch_id'       => $batch->id,
             'expected_total' => $batch->expected_total,
         ]);
+
+        // Notify all accountants and super admins by email
+        $recipients = User::role(['accountant', 'super_admin'])
+            ->where('is_active', true)
+            ->whereNotNull('email')
+            ->get();
+
+        foreach ($recipients as $recipient) {
+            try {
+                Mail::to($recipient->email)->queue(
+                    new BulkBatchSubmittedMail($batch->load(['church.district', 'entries']))
+                );
+            } catch (\Throwable $e) {
+                Log::warning('bulk.notify_accountant_failed', [
+                    'recipient' => $recipient->email,
+                    'error'     => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**

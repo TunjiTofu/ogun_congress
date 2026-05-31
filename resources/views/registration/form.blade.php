@@ -54,18 +54,84 @@
                 return this.category === 'senior_youth' ? '{{ old("club_rank","") }}' || '' : '';
             },
 
-            photoPreview: null,
-            handlePhoto(event) {
+            // ── Photo / Camera state ──────────────────────────────────────────
+            photoPreview:    null,
+            capturedDataUrl: null,
+            cameraOpen:      false,
+            cameraAvailable: false,
+            hasFrontAndBack: false,
+            _stream:         null,
+            _facingMode:     'user',
+
+            handleFileInput(event) {
                 const file = event.target.files[0];
-                if (!file) { this.photoPreview = null; return; }
+                if (!file) return;
+                this.capturedDataUrl = null;
                 const reader = new FileReader();
                 reader.onload = e => { this.photoPreview = e.target.result; };
                 reader.readAsDataURL(file);
             },
-            removePhoto() {
-                this.photoPreview = null;
-                document.getElementById('photo-input').value = '';
+            handlePhoto(event) { this.handleFileInput(event); },
+            clearPhoto() {
+                this.photoPreview    = null;
+                this.capturedDataUrl = null;
+                this.cameraOpen      = false;
+                const inp = document.getElementById('photo-input');
+                if (inp) inp.value = '';
+                if (this._stream) { this._stream.getTracks().forEach(t => t.stop()); this._stream = null; }
             },
+            removePhoto() { this.clearPhoto(); },
+            async openCamera() {
+                this.cameraOpen = true;
+                await this.$nextTick();
+                try {
+                    this._stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: this._facingMode, width:{ideal:640}, height:{ideal:640} },
+                        audio: false,
+                    });
+                    this.$refs.videoEl.srcObject = this._stream;
+                } catch(err) {
+                    this.cameraOpen      = false;
+                    this.cameraAvailable = false;
+                    alert('Camera access denied. Please use the file upload option, or allow camera access in your browser settings and try again.');
+                }
+            },
+            closeCamera() {
+                this.cameraOpen = false;
+                if (this._stream) { this._stream.getTracks().forEach(t => t.stop()); this._stream = null; }
+            },
+            capture() {
+                const video = this.$refs.videoEl, canvas = this.$refs.canvasEl;
+                const size  = 480;
+                canvas.width = canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                const vw = video.videoWidth, vh = video.videoHeight;
+                const side = Math.min(vw, vh);
+                ctx.drawImage(video, (vw-side)/2, (vh-side)/2, side, side, 0, 0, size, size);
+                const dataUrl        = canvas.toDataURL('image/jpeg', 0.92);
+                this.capturedDataUrl = dataUrl;
+                this.photoPreview    = dataUrl;
+                if (this.$refs.photoData) this.$refs.photoData.value = dataUrl;
+                this.closeCamera();
+            },
+            async flipCamera() {
+                this._facingMode = this._facingMode === 'user' ? 'environment' : 'user';
+                this.closeCamera();
+                await this.$nextTick();
+                await this.openCamera();
+            },
+            initCamera() {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    this.cameraAvailable = true;
+                    if (navigator.mediaDevices.enumerateDevices) {
+                        navigator.mediaDevices.enumerateDevices().then(devices => {
+                            this.hasFrontAndBack = devices.filter(d => d.kind === 'videoinput').length > 1;
+                        }).catch(() => {});
+                    }
+                }
+            },
+
+
 
             async loadChurches() {
                 if (!this.districtId) { this.churches = []; return; }
@@ -80,8 +146,8 @@
                 if (!document.querySelector('input[name="gender"]:checked')) {
                     this.validationError = 'Please select your gender.'; return false;
                 }
-                if (!document.getElementById('photo-input')?.files.length) {
-                    this.validationError = 'Please upload a passport photo.'; return false;
+                if (!this.photoPreview && !this.capturedDataUrl) {
+                    this.validationError = 'Please upload or capture a passport photo.'; return false;
                 }
                 // Only validate district/church if church is not locked by the code
                 if (!this.lockedChurchId) {
@@ -127,9 +193,11 @@
                 else if (this.step > 1) { this.step--; }
                 window.scrollTo(0,0);
             },
-            init() { if (this.districtId) this.loadChurches(); },
+            init() { if (this.districtId) this.loadChurches(); this.initCamera(); },
         };
     }
+
+    /* Camera methods merged into main wizard component above */
 </script>
 
 <div class="min-h-screen bg-gray-50 py-8 px-4">
@@ -224,16 +292,18 @@
                         @error('gender')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
 
-                    {{-- Photo with preview --}}
+                    {{-- Passport Photo with Upload + Live Camera --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
                             Passport Photo <span class="text-red-500">*</span>
                         </label>
+
+                        {{-- Preview --}}
                         <div x-show="photoPreview" class="mb-3">
                             <div class="relative inline-block">
                                 <img :src="photoPreview"
                                      class="w-28 h-28 object-cover rounded-xl border-2 border-navy shadow-sm"/>
-                                <button type="button" @click="removePhoto()"
+                                <button type="button" @click="clearPhoto()"
                                         class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white
                                            rounded-full text-xs flex items-center justify-center hover:bg-red-600">
                                     &#10005;
@@ -241,19 +311,84 @@
                             </div>
                             <p class="text-xs text-gray-500 mt-1">
                                 <button type="button" @click="$refs.photoInput.click()"
-                                        class="text-navy underline">Change photo</button>
+                                        class="text-navy underline mr-2">Change photo</button>
+                                <template x-if="cameraAvailable">
+                                    <button type="button" @click="openCamera()"
+                                            class="text-navy underline">Retake with camera</button>
+                                </template>
                             </p>
                         </div>
-                        <div x-show="!photoPreview" @click="$refs.photoInput.click()"
-                             class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center
-                                cursor-pointer hover:border-navy transition">
-                            <div class="text-3xl mb-1">&#128247;</div>
-                            <p class="text-sm font-medium text-gray-700">Click to upload photo</p>
-                            <p class="text-xs text-gray-400 mt-0.5">JPG or PNG &middot; max 2MB &middot; will appear on ID card</p>
+
+                        {{-- Upload + Camera chooser (shown when no preview) --}}
+                        <div x-show="!photoPreview && !cameraOpen" class="space-y-2">
+                            {{-- Upload drop zone --}}
+                            <div @click="$refs.photoInput.click()"
+                                 class="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center
+                                    cursor-pointer hover:border-navy transition">
+                                <div class="text-3xl mb-1">&#128247;</div>
+                                <p class="text-sm font-medium text-gray-700">Click to upload photo</p>
+                                <p class="text-xs text-gray-400 mt-0.5">JPG, PNG or WEBP &middot; max 2 MB &middot; appears on ID card</p>
+                            </div>
+
+                            {{-- Camera button --}}
+                            <template x-if="cameraAvailable">
+                                <button type="button" @click="openCamera()"
+                                        class="w-full flex items-center justify-center gap-2 border border-navy
+                                           text-navy rounded-xl py-3 text-sm font-medium hover:bg-navy
+                                           hover:text-white transition">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
+                                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                              d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    </svg>
+                                    Use live camera
+                                </button>
+                            </template>
                         </div>
+
+                        {{-- Live camera panel --}}
+                        <div x-show="cameraOpen" x-cloak class="space-y-3">
+                            <div class="relative rounded-xl overflow-hidden bg-black aspect-square max-w-xs mx-auto">
+                                <video x-ref="videoEl" autoplay playsinline muted
+                                       class="w-full h-full object-cover"></video>
+                                {{-- Mirror overlay guide --}}
+                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div class="w-24 h-28 border-2 border-white border-opacity-50 rounded-lg"></div>
+                                </div>
+                            </div>
+                            <canvas x-ref="canvasEl" class="hidden"></canvas>
+                            <div class="flex gap-2 max-w-xs mx-auto">
+                                <button type="button" @click="capture()"
+                                        class="flex-1 bg-navy text-white rounded-xl py-3 text-sm font-semibold
+                                           hover:opacity-90 transition flex items-center justify-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none"
+                                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="3"/><path d="M20 7h-3.5l-1-2h-7l-1 2H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+                                    </svg>
+                                    Capture
+                                </button>
+                                <button type="button" @click="closeCamera()"
+                                        class="px-4 border border-gray-300 rounded-xl text-sm text-gray-600
+                                           hover:border-gray-400 transition">
+                                    Cancel
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 text-center">
+                                <button type="button" @click="flipCamera()" class="underline" x-show="hasFrontAndBack">
+                                    Flip camera
+                                </button>
+                            </p>
+                        </div>
+
+                        {{-- Hidden file input (for upload mode) --}}
                         <input type="file" name="photo" id="photo-input" x-ref="photoInput"
                                accept="image/jpeg,image/png,image/webp" class="hidden"
-                               @change="handlePhoto($event)"/>
+                               @change="handleFileInput($event)"/>
+                        {{-- Hidden input carrying the captured image data for form submission --}}
+                        <input type="hidden" name="photo_data_url" x-ref="photoData" x-model="capturedDataUrl"/>
+
                         @error('photo')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
 

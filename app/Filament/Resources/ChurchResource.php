@@ -21,7 +21,7 @@ class ChurchResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasRole('super_admin');
+        return auth()->user()->hasRole(['super_admin', 'admin']);
     }
 
     public static function form(Form $form): Form
@@ -77,6 +77,16 @@ class ChurchResource extends Resource
                         }
                     }),
             ]);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return ! auth()->user()->hasRole('admin');
+    }
+
+    public static function canDelete($record): bool
+    {
+        return ! auth()->user()->hasRole('admin');
     }
 
     public static function getPages(): array

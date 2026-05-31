@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\BulkRegistrationBatch;
+use App\Models\CampMedia;
+use App\Models\OfflinePayment;
+use App\Models\RegistrationCode;
+use App\Models\YoutubeHighlight;
+use App\Observers\AdminActivityObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -19,6 +25,31 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $observer = new AdminActivityObserver();
+
+        // Hook each model event to the observer manually
+        // (avoids needing separate observer classes per model)
+
+        OfflinePayment::created(fn ($m) => $observer->offlinePaymentCreated($m));
+        OfflinePayment::updated(fn ($m) => $observer->offlinePaymentUpdated($m));
+
+        RegistrationCode::updated(fn ($m) => $observer->registrationCodeUpdated($m));
+
+        BulkRegistrationBatch::updated(fn ($m) => $observer->bulkBatchUpdated($m));
+
+        // Media role actions
+        CampMedia::created(fn ($m) => $observer->campMediaCreated($m));
+        CampMedia::updated(fn ($m) => $observer->campMediaUpdated($m));
+        CampMedia::deleted(fn ($m) => $observer->campMediaDeleted($m));
+
+        YoutubeHighlight::created(fn ($m) => $observer->youtubeHighlightCreated($m));
+        YoutubeHighlight::updated(fn ($m) => $observer->youtubeHighlightUpdated($m));
+        YoutubeHighlight::deleted(fn ($m) => $observer->youtubeHighlightDeleted($m));
+
+        // Filament also fires model events for admin panel actions,
+        // so the above hooks capture: offline payment creation/confirmation/rejection,
+        // code voiding/expiry, bulk batch confirmation — everything an accountant does.
+
         // Force PHP to use user-writable tmp directory (shared hosting fix)
         putenv('TMPDIR=/home2/gratusco/tmp');
         ini_set('upload_tmp_dir', '/home2/gratusco/tmp');

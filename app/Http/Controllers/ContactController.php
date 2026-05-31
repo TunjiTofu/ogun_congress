@@ -11,11 +11,11 @@ use Illuminate\Support\Facades\Log;
 class ContactController extends Controller
 {
     private array $categoryRouting = [
-        'general'   => ['camp_director', 'secretariat'],
-        'complaint' => ['camp_director'],
-        'inquiry'   => ['super_admin', 'camp_director', 'secretariat', 'accountant'],
-        'payment'   => ['accountant'],
-        'question'  => ['camp_director', 'secretariat'],
+        'general'   => ['admin', 'camp_director', 'secretariat'],
+        'complaint' => ['admin', 'camp_director'],
+        'inquiry'   => ['admin', 'super_admin', 'camp_director', 'secretariat', 'accountant'],
+        'payment'   => ['admin', 'accountant'],
+        'question'  => ['admin', 'camp_director', 'secretariat'],
     ];
 
     public function store(Request $request)
@@ -35,7 +35,7 @@ class ContactController extends Controller
         ]);
 
         // Filament DB notifications to appropriate roles
-        $targetRoles = $this->categoryRouting[$msg->category] ?? ['secretariat'];
+        $targetRoles = $this->categoryRouting[$msg->category] ?? ['super_admin', 'admin', 'secretariat'];
         if (! in_array('super_admin', $targetRoles)) {
             $targetRoles[] = 'super_admin';
         }
