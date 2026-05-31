@@ -112,7 +112,7 @@ class DocumentGenerationService
     }
 
     /**
-     * Generate a QR code as a base64-encoded PNG.
+     * Generate a QR code as a base64-encoded PNG
      *
      * simplesoftwareio/simple-qrcode requires Imagick for PNG on PHP 8.4+.
      * On servers without Imagick we bypass the wrapper entirely:
