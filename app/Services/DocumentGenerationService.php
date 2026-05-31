@@ -112,7 +112,7 @@ class DocumentGenerationService
     }
 
     /**
-     * Generate a QR code as a base64-encoded PNG
+     * Generate a QR code as a base64-encoded PNG.
      *
      * simplesoftwareio/simple-qrcode requires Imagick for PNG on PHP 8.4+.
      * On servers without Imagick we bypass the wrapper entirely:
@@ -162,10 +162,19 @@ class DocumentGenerationService
             throw new \RuntimeException('GD extension is not loaded');
         }
 
-        // Encode data into a QR matrix via BaconQrCode low-level API
+        // Encode data into a QR matrix via BaconQrCode low-level API.
+        // BaconQrCode v2.x uses dasprid/enum — values are accessed via __callStatic.
+        // method_exists() returns FALSE for __callStatic, so we cannot use it to detect.
+        // Try M() first (v2.x); fall back to M constant access (v3.x PHP enum).
+        try {
+            $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M();
+        } catch (\Throwable $e) {
+            $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M;
+        }
+
         $qrCode  = \BaconQrCode\Encoder\Encoder::encode(
             $content,
-            \BaconQrCode\Common\ErrorCorrectionLevel::M(),
+            $ecLevel,
             'ISO-8859-1'
         );
         $matrix  = $qrCode->getMatrix();
