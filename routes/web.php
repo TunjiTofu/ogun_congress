@@ -238,7 +238,6 @@ Route::middleware(['auth'])->prefix('artisan')->name('artisan.')->group(function
             'DatabaseSeeder',
             'DistrictAndChurchSeeder',
             'CampRoleSeeder',
-            'RolesAndPermissionsSeeder'
         ];
 
         $class = request('class', 'RolesAndPermissionsSeeder');
