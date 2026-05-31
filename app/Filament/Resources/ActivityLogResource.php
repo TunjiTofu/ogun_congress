@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\ActivityLogResource\Pages\ListActivityLog;
+use App\Filament\Resources\ActivityLogResource\Pages\ListActivityLogs;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -129,7 +129,7 @@ class ActivityLogResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListActivityLog::route('/'),
+            'index' => ListActivityLogs::route('/'),
         ];
     }
 }
