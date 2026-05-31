@@ -22,7 +22,7 @@ class ContactMessageResource extends Resource
     public static function canAccess(): bool
     {
         return auth()->user()->hasAnyRole([
-            'super_admin', 'camp_director', 'secretariat', 'accountant',
+            'super_admin', 'admin', 'camp_director', 'secretariat', 'accountant',
         ]);
     }
 
@@ -55,6 +55,7 @@ class ContactMessageResource extends Resource
         }
 
         $roleCategories = [
+            'admin' => ['general', 'complaint', 'payment', 'inquiry', 'question'],
             'camp_director' => ['general', 'complaint', 'inquiry', 'question'],
             'secretariat'   => ['general', 'inquiry', 'question'],
             'accountant'    => ['payment', 'inquiry'],
@@ -167,6 +168,16 @@ class ContactMessageResource extends Resource
                 ]),
             ])
             ->recordClasses(fn (ContactMessage $r) => $r->isReadBy(auth()->id()) ? '' : 'bg-amber-50');
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return ! auth()->user()->hasRole('admin');
+    }
+
+    public static function canDelete($record): bool
+    {
+        return ! auth()->user()->hasRole('admin');
     }
 
     public static function getPages(): array

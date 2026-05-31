@@ -63,6 +63,8 @@ class UserResource extends Resource
                             'secretariat'       => 'Secretariat',
                             'security'          => 'Security',
                             'church_coordinator'=> 'Church Coordinator',
+                            'admin'             => 'Admin (Edit Only)',
+                            'media'             => 'Media Manager',
                             default             => ucwords(str_replace('_', ' ', $name)),
                         }])
                         ->toArray()
@@ -123,6 +125,15 @@ class UserResource extends Resource
 
                 Tables\Columns\TextColumn::make('phone')->placeholder('—'),
 
+                Tables\Columns\TextColumn::make('temp_password')
+                    ->label('Temp Password')
+                    ->placeholder('—')
+                    ->copyable()
+                    ->copyMessage('Password copied')
+                    ->fontFamily('mono')
+                    ->visible(fn () => auth()->user()->hasRole('super_admin'))
+                    ->tooltip('Temporary password — blank once changed by user'),
+
                 Tables\Columns\TextColumn::make('roles.name')
                     ->label('Role')
                     ->badge()
@@ -139,6 +150,13 @@ class UserResource extends Resource
                     ->label('Active')
                     ->boolean(),
 
+                Tables\Columns\TextColumn::make('locked_until')
+                    ->label('Blocked Until')
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('—')
+                    ->color('danger')
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('last_login_at')
                     ->label('Last Login')
                     ->dateTime('d M Y, H:i')
@@ -150,14 +168,112 @@ class UserResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+
+                Tables\Actions\Action::make('reset_password')
+                    ->label('Reset Password')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->visible(fn () => auth()->user()->hasRole('super_admin'))
+                    ->requiresConfirmation()
+                    ->modalDescription('A new temporary password will be generated and emailed to the user. They must change it on next login.')
+                    ->action(function (User $record) {
+                        $newPwd = 'Tmp@' . strtoupper(\Illuminate\Support\Str::random(5)) . rand(10, 99) . '!';
+                        $record->update([
+                            'password'             => \Illuminate\Support\Facades\Hash::make($newPwd),
+                            'temp_password'        => $newPwd,
+                            'must_change_password' => true,
+                        ]);
+                        $role = $record->getRoleNames()->first() ?? 'admin';
+                        try {
+                            \Illuminate\Support\Facades\Mail::to($record->email)->send(
+                                new \App\Mail\AdminWelcomeMail($record, $newPwd, ucfirst(str_replace('_', ' ', $role)))
+                            );
+                            \Filament\Notifications\Notification::make()
+                                ->title('Password reset. Credentials emailed to ' . $record->email)
+                                ->success()->send();
+                        } catch (\Throwable $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Password reset, but email failed: ' . $e->getMessage())
+                                ->warning()->send();
+                        }
+                    }),
+
                 Tables\Actions\Action::make('deactivate')
                     ->label('Deactivate')
                     ->icon('heroicon-o-no-symbol')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (User $r) => $r->is_active && ! $r->hasRole('super_admin'))
-                    ->action(fn (User $record) => $record->update(['is_active' => false])),
+                    ->visible(fn (User $record) => $record->is_active && ! $record->hasRole('super_admin'))
+                    ->action(function (User $record) {
+                        $record->update(['is_active' => false]);
+                        activity('user_management')
+                            ->performedOn($record)
+                            ->causedBy(auth()->user())
+                            ->log('User deactivated: ' . $record->email);
+                    }),
+
+                Tables\Actions\Action::make('block')
+                    ->label('Block Login')
+                    ->icon('heroicon-o-lock-closed')
+                    ->color('danger')
+                    ->visible(fn (User $record) => ! $record->hasRole('super_admin') && ! $record->isLockedOut())
+                    ->form([
+                        \Filament\Forms\Components\Select::make('duration')
+                            ->label('Block duration')
+                            ->options([
+                                '1'    => '1 hour',
+                                '6'    => '6 hours',
+                                '24'   => '24 hours',
+                                '168'  => '7 days',
+                                '720'  => '30 days',
+                                '9999' => 'Permanently (until manually unblocked)',
+                            ])
+                            ->default('24')
+                            ->required(),
+                        \Filament\Forms\Components\Textarea::make('reason')
+                            ->label('Reason (for audit log)')
+                            ->rows(2)
+                            ->required(),
+                    ])
+                    ->action(function (User $record, array $data) {
+                        $until = now()->addHours((int) $data['duration']);
+                        $record->update(['locked_until' => $until]);
+                        activity('user_management')
+                            ->performedOn($record)
+                            ->causedBy(auth()->user())
+                            ->withProperties(['reason' => $data['reason'], 'until' => $until->toDateTimeString()])
+                            ->log('User login blocked: ' . $record->email);
+                        \Filament\Notifications\Notification::make()
+                            ->title('Login blocked until ' . $until->format('d M Y H:i'))
+                            ->warning()->send();
+                    }),
+
+                Tables\Actions\Action::make('unblock')
+                    ->label('Unblock')
+                    ->icon('heroicon-o-lock-open')
+                    ->color('success')
+                    ->visible(fn (User $record) => $record->isLockedOut())
+                    ->requiresConfirmation()
+                    ->action(function (User $record) {
+                        $record->update(['locked_until' => null]);
+                        activity('user_management')
+                            ->performedOn($record)
+                            ->causedBy(auth()->user())
+                            ->log('User login unblocked: ' . $record->email);
+                        \Filament\Notifications\Notification::make()
+                            ->title('User unblocked successfully.')
+                            ->success()->send();
+                    }),
             ]);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()->hasRole('super_admin');
+    }
+    public static function canDelete($record): bool
+    {
+        return auth()->user()->hasRole('super_admin') && ! $record->hasRole('super_admin');
     }
 
     public static function getPages(): array

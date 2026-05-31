@@ -25,7 +25,7 @@ class PhotoReviewPage extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasRole('super_admin');
+        return auth()->user()->hasRole(['super_admin', 'admin']);
     }
 
     public function table(Table $table): Table

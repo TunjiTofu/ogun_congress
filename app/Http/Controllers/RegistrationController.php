@@ -36,24 +36,38 @@ class RegistrationController extends Controller
         }
     }
 
-    public function downloads(string $code)
+    public function downloads(string $identifier)
     {
-        $registrationCode = \App\Models\RegistrationCode::with('camper')
-            ->where('code', $code)->first();
+        // Accept either a registration code OR a camper_number
+        $camper = \App\Models\Camper::where('camper_number', $identifier)->first();
 
-        if (! $registrationCode?->camper) {
-            return response()->json(['id_card_url' => null, 'consent_form_url' => null]);
+        if (! $camper) {
+            // Fallback: look up via registration code
+            $registrationCode = \App\Models\RegistrationCode::with('camper')
+                ->where('code', $identifier)->first();
+            $camper = $registrationCode?->camper;
         }
 
-        $camper = $registrationCode->camper;
+        if (! $camper) {
+            return response()->json(['status' => 'not_found']);
+        }
+
+        $needsConsent = $camper->requiresConsentForm();
+        $idReady      = (bool) $camper->id_card_path;
+        $consentReady = ! $needsConsent || (bool) $camper->consent_form_path;
+        $allReady     = $idReady && $consentReady;
 
         return response()->json([
-            'id_card_url'      => $camper->id_card_path
-                ? route('documents.download', ['path' => base64_encode($camper->id_card_path)])
-                : null,
-            'consent_form_url' => $camper->consent_form_path
-                ? route('documents.download', ['path' => base64_encode($camper->consent_form_path)])
-                : null,
+            'status'       => $allReady ? 'ready' : 'pending',
+            'needs_consent'=> $needsConsent,
+            'urls'         => [
+                'id_card'      => $camper->id_card_path
+                    ? route('documents.download', ['path' => base64_encode($camper->id_card_path)])
+                    : null,
+                'consent_form' => $camper->consent_form_path
+                    ? route('documents.download', ['path' => base64_encode($camper->consent_form_path)])
+                    : null,
+            ],
         ]);
     }
 
@@ -122,16 +136,13 @@ class RegistrationController extends Controller
         $data = $request->validated();
         unset($data['photo']);
 
+        // ── Photo from file upload ───────────────────────────────────────────
         if ($request->hasFile('photo') && $request->file('photo')->isValid()) {
             $file     = $request->file('photo');
             $realPath = $file->getRealPath();
 
             if ($realPath && file_exists($realPath)) {
                 $rawBytes = file_get_contents($realPath);
-
-                // Convert to JPEG via GD — handles WebP, PNG, GIF, JPEG.
-                // GD's imagecreatefromstring() auto-detects the format.
-                // Storing as JPEG ensures DomPDF compatibility permanently.
                 $jpegBytes = $this->toJpeg($rawBytes);
 
                 $data['photo_contents']  = $jpegBytes;
@@ -139,6 +150,25 @@ class RegistrationController extends Controller
                 $data['photo_filename']  = 'photo.jpg';
             }
         }
+
+        // ── Photo from live camera capture (base64 data URL) ─────────────────
+        // Submitted via <input type="hidden" name="photo_data_url"> when camper uses camera.
+        // Takes precedence only when no file upload is present.
+        if (empty($data['photo_contents'])) {
+            $dataUrl = $request->input('photo_data_url', '');
+            if (str_starts_with($dataUrl, 'data:image/')) {
+                // Strip the data URL prefix: data:image/jpeg;base64,{base64}
+                $base64   = preg_replace('/^data:image\/[a-z]+;base64,/', '', $dataUrl);
+                $rawBytes = base64_decode($base64);
+                if ($rawBytes !== false && strlen($rawBytes) > 0) {
+                    $jpegBytes = $this->toJpeg($rawBytes);
+                    $data['photo_contents']  = $jpegBytes;
+                    $data['photo_mime_type'] = 'image/jpeg';
+                    $data['photo_filename']  = 'photo.jpg';
+                }
+            }
+        }
+        unset($data['photo_data_url']); // never passed to service
 
         $camper = $this->registrationService->submit($data);
 

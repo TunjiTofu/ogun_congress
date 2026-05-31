@@ -20,7 +20,7 @@ class ProgrammeSessionResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'camp_director']);
+        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'secretariat', 'camp_director']);
     }
 
     public static function form(Form $form): Form
@@ -134,6 +134,16 @@ class ProgrammeSessionResource extends Resource
                     ->url(route('attendance.export.all'))
                     ->openUrlInNewTab(),
             ]);
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return ! auth()->user()->hasRole('admin');
+    }
+
+    public static function canDelete($record): bool
+    {
+        return ! auth()->user()->hasRole('admin');
     }
 
     public static function getPages(): array

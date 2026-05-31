@@ -6,7 +6,6 @@ use App\Models\Camper;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class DocumentGenerationService
 {
@@ -14,11 +13,11 @@ class DocumentGenerationService
     {
         $camper->load(['media', 'church.district']);
 
-        // Department colors: Adventurer=green, Pathfinder=navy, Senior Youth=crimson
+        // Department colors
         $departmentColors = [
-            'pathfinder'   => '#2D7A3A',  // Green
-            'adventurer'   => '#1B3A8F',  // Navy Blue
-            'senior_youth' => '#C9A94D',  // Gold
+            'pathfinder'   => '#2D7A3A',
+            'adventurer'   => '#1B3A8F',
+            'senior_youth' => '#C9A94D',
         ];
         $categoryValue = $camper->category?->value ?? 'senior_youth';
         $badgeColor    = $camper->badge_color
@@ -52,7 +51,11 @@ class DocumentGenerationService
             'campName'     => setting('camp_name', 'Ogun Youth Camp'),
             'campYear'     => now()->year,
         ])->setPaper([0, 0, 153.07, 242.57], 'portrait')
-            ->setOptions(['dpi' => 150, 'isHtml5ParserEnabled' => true, 'isRemoteEnabled' => false]);
+            ->setOptions([
+                'dpi'                  => 150,
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled'      => false,
+            ]);
 
         $path = 'id-cards/' . $camper->camper_number . '.pdf';
         Storage::disk('private')->put($path, $pdf->output());
@@ -108,44 +111,110 @@ class DocumentGenerationService
         return null;
     }
 
+    /**
+     * Generate a QR code as a base64-encoded PNG.
+     *
+     * simplesoftwareio/simple-qrcode requires Imagick for PNG on PHP 8.4+.
+     * On servers without Imagick we bypass the wrapper entirely:
+     * 1. Use BaconQrCode (already installed as a transitive dependency) to
+     *    encode the data into a raw pixel matrix — pure PHP, no extensions.
+     * 2. Render that matrix as a PNG with PHP's GD extension.
+     *
+     * DomPDF cannot render SVG data URLs, so we never fall back to SVG.
+     */
     private function generateQrCode(string $camperNumber, ?int $camperId = null): string
     {
-        $verifyUrl = url('/verify/' . $camperNumber);
+        $content = 'OGN:' . $camperNumber;
 
-        // PNG via GD — no imagick needed
-        if (extension_loaded('gd')) {
-            try {
-                $png = (string) QrCode::format('png')
-                    ->size(200)->margin(1)->errorCorrection('M')
-                    ->generate($verifyUrl);
-
-                Storage::disk('public')->put('qr-codes/' . $camperNumber . '.png', $png);
-                if ($camperId) {
-                    \App\Models\Camper::where('id', $camperId)
-                        ->update(['qr_code_path' => 'qr-codes/' . $camperNumber . '.png']);
-                }
-                return 'data:image/png;base64,' . base64_encode($png);
-            } catch (\Throwable $e) {
-                Log::debug('QR PNG failed, trying SVG', ['error' => $e->getMessage()]);
-            }
-        }
-
-        // SVG fallback
         try {
-            $svg = (string) QrCode::format('svg')
-                ->size(200)->margin(1)->errorCorrection('M')
-                ->generate($verifyUrl);
+            $png = $this->generateQrPngWithGd($content, 200);
 
-            Storage::disk('public')->put('qr-codes/' . $camperNumber . '.svg', $svg);
+            Storage::disk('public')->put('qr-codes/' . $camperNumber . '.png', $png);
+
             if ($camperId) {
                 \App\Models\Camper::where('id', $camperId)
-                    ->update(['qr_code_path' => 'qr-codes/' . $camperNumber . '.svg']);
+                    ->update(['qr_code_path' => 'qr-codes/' . $camperNumber . '.png']);
             }
-            return 'data:image/svg+xml;base64,' . base64_encode($svg);
+
+            return 'data:image/png;base64,' . base64_encode($png);
+
         } catch (\Throwable $e) {
-            Log::warning('QR generation failed', ['error' => $e->getMessage()]);
-            return '';
+            Log::error('QR code generation failed', [
+                'camper_number'  => $camperNumber,
+                'error'          => $e->getMessage(),
+                'gd_loaded'      => extension_loaded('gd'),
+                'imagick_loaded' => extension_loaded('imagick'),
+            ]);
+            // Transparent 1×1 placeholder — keeps the PDF layout intact
+            return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
         }
+    }
+
+    /**
+     * Render a QR code as a raw PNG string using only GD (no Imagick).
+     *
+     * Uses BaconQrCode to produce the bit-matrix, then draws each dark
+     * module as a filled rectangle with imagefilledrectangle().
+     */
+    private function generateQrPngWithGd(string $content, int $targetSize = 200): string
+    {
+        if (! extension_loaded('gd')) {
+            throw new \RuntimeException('GD extension is not loaded');
+        }
+
+        // Encode data into a QR matrix via BaconQrCode low-level API.
+        // BaconQrCode v2.x uses dasprid/enum — values are accessed via __callStatic.
+        // method_exists() returns FALSE for __callStatic, so we cannot use it to detect.
+        // Try M() first (v2.x); fall back to M constant access (v3.x PHP enum).
+        try {
+            $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M();
+        } catch (\Throwable $e) {
+            $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M;
+        }
+
+        $qrCode  = \BaconQrCode\Encoder\Encoder::encode(
+            $content,
+            $ecLevel,
+            'ISO-8859-1'
+        );
+        $matrix  = $qrCode->getMatrix();
+        $modules = $matrix->getWidth(); // matrix is square
+
+        // Add 4-module quiet zone on all sides (required by QR spec)
+        $quietZone    = 4;
+        $totalModules = $modules + $quietZone * 2;
+
+        // Pixel size per module (at least 1px)
+        $cellSize  = max(1, (int) floor($targetSize / $totalModules));
+        $imageSize = $totalModules * $cellSize;
+
+        $img   = imagecreatetruecolor($imageSize, $imageSize);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+
+        imagefill($img, 0, 0, $white);
+
+        for ($row = 0; $row < $modules; $row++) {
+            for ($col = 0; $col < $modules; $col++) {
+                // get() returns 1 (int) or true (bool) for dark modules
+                if ($matrix->get($col, $row) !== 0) {
+                    $x1 = ($col + $quietZone) * $cellSize;
+                    $y1 = ($row + $quietZone) * $cellSize;
+                    imagefilledrectangle($img, $x1, $y1, $x1 + $cellSize - 1, $y1 + $cellSize - 1, $black);
+                }
+            }
+        }
+
+        ob_start();
+        imagepng($img);
+        $png = ob_get_clean();
+        imagedestroy($img);
+
+        if (empty($png)) {
+            throw new \RuntimeException('GD imagepng() returned empty output');
+        }
+
+        return $png;
     }
 
     /**
@@ -169,7 +238,6 @@ class DocumentGenerationService
             : $media->getPath();
 
         if (! file_exists($path)) {
-            // Thumb may not exist yet — try original directly
             $path = $media->getPath();
         }
 
@@ -182,7 +250,6 @@ class DocumentGenerationService
             return '';
         }
 
-        // All photos stored by this system are JPEG (converted at upload time)
         return 'data:image/jpeg;base64,' . base64_encode(file_get_contents($path));
     }
 }

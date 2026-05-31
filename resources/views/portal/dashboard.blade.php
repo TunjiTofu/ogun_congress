@@ -204,16 +204,16 @@
         <span class="section-title">My Documents</span>
     </div>
     <div class="doc-grid" style="margin-bottom:1.5rem">
-        <div class="doc-card">
-            <div class="doc-icon">🪪</div>
-            <div class="doc-title">ID Card</div>
-            <div class="doc-desc">Your official camp ID card with QR code. Print and carry at all times during the congress.</div>
-            @if($idCardUrl)
-                <a href="{{ $idCardUrl }}" target="_blank" class="btn-dl btn-dl-navy">⬇ Download ID Card</a>
-            @else
-                <span class="btn-dl btn-dl-muted">⏳ Generating...</span>
-            @endif
-        </div>
+{{--        <div class="doc-card">--}}
+{{--            <div class="doc-icon">🪪</div>--}}
+{{--            <div class="doc-title">ID Card</div>--}}
+{{--            <div class="doc-desc">Your official camp ID card with QR code. Print and carry at all times during the congress.</div>--}}
+{{--            @if($idCardUrl)--}}
+{{--                <a href="{{ $idCardUrl }}" target="_blank" class="btn-dl btn-dl-navy">⬇ Download ID Card</a>--}}
+{{--            @else--}}
+{{--                <span class="btn-dl btn-dl-muted">⏳ Generating...</span>--}}
+{{--            @endif--}}
+{{--        </div>--}}
 
         @if($camper->requiresConsentForm())
             <div class="doc-card">
