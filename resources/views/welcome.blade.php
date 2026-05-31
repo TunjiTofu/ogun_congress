@@ -782,7 +782,7 @@
                 <p class="section-lede" style="max-width:100%">For enquiries, complaints, or payment questions — reach us through any of the channels below, or send a message and we'll respond within 24 hours.</p>
                 <div style="display:flex;flex-direction:column;gap:10px;margin-top:36px">
                     @if(setting('treasurer_number'))
-                        <a href="https://wa.me/{{ preg_replace('/\D/','',setting('whatsapp_number')) }}" target="_blank" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">
+                        <a href="https://wa.me/{{ preg_replace('/\D/','',setting('treasurer_number')) }}" target="_blank" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">
                             <div style="width:44px;height:44px;border-radius:12px;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#128172;</div>
                             <div style="flex:1"><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Treasurer</div><div style="font-size:13px;color:var(--text-2)">{{ setting('treasurer_number') }}</div></div>
                             <span style="font-size:16px;color:var(--muted)">&nearr;</span>
