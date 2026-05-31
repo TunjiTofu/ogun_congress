@@ -232,7 +232,7 @@ Route::middleware(['auth'])->prefix('artisan')->name('artisan.')->group(function
     Route::get('seed', function () use ($terminal) {
         if (! auth()->user()->hasRole('super_admin')) abort(403);
 
-        // Whitelist allowed seeders — never allow arbitrary class execution
+        // Whitelist allowed seeders — never allow arbitrary class execution.
         $allowed = [
             'RolesSeeder',
             'DatabaseSeeder',
