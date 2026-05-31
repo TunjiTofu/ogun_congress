@@ -13,6 +13,8 @@ class CoordinatorDashboard extends Page
     protected static ?string $navigationLabel = 'My Dashboard';
     protected static ?int    $navigationSort  = -10;
     protected static string  $view            = 'filament.pages.coordinator-dashboard';
+    protected static ?string $title           = 'Youth Leader Dashboard';
+
 
     public static function canAccess(): bool
     {

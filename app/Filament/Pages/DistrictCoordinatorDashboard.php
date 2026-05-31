@@ -15,6 +15,8 @@ class DistrictCoordinatorDashboard extends Page
     protected static ?string $navigationLabel = 'My District';
     protected static ?int    $navigationSort  = -10;
     protected static string  $view            = 'filament.pages.district-coordinator-dashboard';
+    protected static ?string $title           = 'District Youth Leader Dashboard';
+
 
     public static function canAccess(): bool
     {

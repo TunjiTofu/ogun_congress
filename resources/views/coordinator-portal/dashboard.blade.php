@@ -112,7 +112,7 @@
 
     {{-- Church header --}}
     <div class="header-card">
-        <div class="header-label">Church Coordinator Dashboard</div>
+        <div class="header-label">Youth Leader Dashboard</div>
         <div class="header-church">{{ $church?->name ?? 'No Church Assigned' }}</div>
         <div class="header-dist">{{ $church?->district?->name }} &bull; {{ now()->format('d F Y') }}</div>
     </div>

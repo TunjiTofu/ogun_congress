@@ -14,7 +14,7 @@
 
     {{-- Header --}}
     <div style="background:linear-gradient(135deg,#020617,#0F172A,#1E293B);border-radius:16px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;border:1px solid #1E293B">
-        <p style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#FBBF24;margin-bottom:0.2rem">Accountant Dashboard — Payment Management</p>
+        <p style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:#FBBF24;margin-bottom:0.2rem">Treasurer's  Dashboard — Payment Management</p>
         <h1 style="font-size:1.4rem;font-weight:900;color:#F1F5F9;line-height:1.2">Good {{ now()->hour < 12 ? 'Morning' : (now()->hour < 17 ? 'Afternoon' : 'Evening') }}, {{ auth()->user()->name }}</h1>
         <p style="font-size:0.75rem;color:rgba(255,255,255,0.55);margin-top:0.2rem">{{ now()->format('l, d F Y') }} · Ogun Conference Youth Congress 2026</p>
     </div>
@@ -22,11 +22,11 @@
     {{-- Stats --}}
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.85rem;margin-bottom:1.25rem">
         <div style="background:var(--d-stat-3-bg);border:1px solid var(--d-stat-3-bc);border-radius:14px;padding:1rem 1.1rem">
-            <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--d-stat-3-tc);margin-bottom:0.35rem">⏳ Pending Offline</p>
+            <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--d-stat-3-tc);margin-bottom:0.35rem">⏳ Pending Individual Payment</p>
             <p style="font-size:2rem;font-weight:900;color:var(--d-stat-3-vc);line-height:1">{{ $pendingOffline }}</p>
         </div>
         <div style="background:var(--d-stat-2-bg);border:1px solid var(--d-stat-2-bc);border-radius:14px;padding:1rem 1.1rem">
-            <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--d-stat-2-tc);margin-bottom:0.35rem">✅ Confirmed Offline</p>
+            <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--d-stat-2-tc);margin-bottom:0.35rem">✅ Confirmed Individual Payment</p>
             <p style="font-size:2rem;font-weight:900;color:var(--d-stat-2-vc);line-height:1">{{ $confirmedOffline }}</p>
         </div>
         <div style="background:var(--d-stat-4-bg);border:1px solid var(--d-stat-4-bc);border-radius:14px;padding:1rem 1.1rem">
@@ -47,7 +47,7 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
             <div style="background:var(--d-stat-2-bg);border:1px solid var(--d-stat-2-bc);border-radius:10px;padding:0.85rem 1rem">
-                <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--d-stat-2-tc);margin-bottom:0.25rem">Offline Payments</p>
+                <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--d-stat-2-tc);margin-bottom:0.25rem">Individual Payments</p>
                 <p style="font-size:1.3rem;font-weight:800;color:var(--d-stat-2-vc)">₦{{ number_format($totalOfflineCollected) }}</p>
                 <p style="font-size:0.68rem;color:#4ADE80;margin-top:2px">{{ $confirmedOffline }} confirmed payments</p>
             </div>
@@ -64,7 +64,7 @@
         <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--d-border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
             <div style="display:flex;align-items:center;gap:0.6rem">
                 <span style="width:8px;height:8px;border-radius:50%;background:#FBBF24;display:inline-block"></span>
-                <span style="font-size:0.85rem;font-weight:700;color:var(--d-text)">Pending Offline Payments</span>
+                <span style="font-size:0.85rem;font-weight:700;color:var(--d-text)">Pending Individual Payments</span>
             </div>
             <a href="{{ url('/admin/offline-payments?tableFilters[status][value]=pending') }}" style="font-size:0.68rem;color:#818CF8;font-weight:600;text-decoration:none">View all →</a>
         </div>
@@ -82,7 +82,7 @@
                     </div>
                 </div>
             @empty
-                <div style="padding:2rem;text-align:center;color:var(--d-text-3);font-size:0.82rem;font-style:italic">✓ No pending offline payments.</div>
+                <div style="padding:2rem;text-align:center;color:var(--d-text-3);font-size:0.82rem;font-style:italic">✓ No pending individual payments.</div>
             @endforelse
         </div>
     </div>

@@ -112,27 +112,27 @@ class RegistrationCodeResource extends Resource
                         ->toArray()),
             ])
             ->actions([
-                Tables\Actions\Action::make('resend_sms')
-                    ->label('Resend Code SMS')
-                    ->icon('heroicon-o-device-phone-mobile')
-                    ->color('info')
-                    ->requiresConfirmation()
-                    ->modalDescription(fn (RegistrationCode $r) =>
-                        "Resend the registration code to {$r->prefill_phone}?"
-                    )
-                    ->visible(fn (RegistrationCode $r) => $r->status === CodeStatus::ACTIVE)
-                    ->action(function (RegistrationCode $record) {
-                        SendRegistrationCodeSmsJob::dispatch(
-                            phone: $record->prefill_phone,
-                            code:  $record->code,
-                            name:  $record->prefill_name,
-                        );
-
-                        Notification::make()
-                            ->title('SMS queued successfully.')
-                            ->success()
-                            ->send();
-                    }),
+//                Tables\Actions\Action::make('resend_sms')
+//                    ->label('Resend Code SMS')
+//                    ->icon('heroicon-o-device-phone-mobile')
+//                    ->color('info')
+//                    ->requiresConfirmation()
+//                    ->modalDescription(fn (RegistrationCode $r) =>
+//                        "Resend the registration code to {$r->prefill_phone}?"
+//                    )
+//                    ->visible(fn (RegistrationCode $r) => $r->status === CodeStatus::ACTIVE)
+//                    ->action(function (RegistrationCode $record) {
+//                        SendRegistrationCodeSmsJob::dispatch(
+//                            phone: $record->prefill_phone,
+//                            code:  $record->code,
+//                            name:  $record->prefill_name,
+//                        );
+//
+//                        Notification::make()
+//                            ->title('SMS queued successfully.')
+//                            ->success()
+//                            ->send();
+//                    }),
 
                 Tables\Actions\Action::make('void')
                     ->label('Void Code')
