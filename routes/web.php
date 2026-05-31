@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\Console\Output\BufferedOutput;
 
-// ── Proof image server ────────────────────────────────────────────────────────
+// ── Proof image server ───────────────────────────────────────────────────────
 Route::get('/proof-image/{path}', function (string $path) {
     $fullPath = storage_path('app/public/' . base64_decode($path));
     if (! file_exists($fullPath)) abort(404);
