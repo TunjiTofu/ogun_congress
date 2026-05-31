@@ -205,12 +205,52 @@ class GenerateBulkIdCardsJob implements ShouldQueue
     private function encodeQr(Camper $c): ?string
     {
         try {
-            $qr = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')
-                ->size(120)->errorCorrection('M')
-                ->generate('OGN:' . $c->camper_number);
-            return 'data:image/png;base64,' . base64_encode($qr);
+            return $this->generateQrPngWithGd('OGN:' . $c->camper_number, 120);
         } catch (\Throwable $e) {
+            Log::warning('bulk_id_card.qr_encode_failed', ['camper' => $c->id, 'error' => $e->getMessage()]);
             return null;
         }
+    }
+
+    private function generateQrPngWithGd(string $content, int $targetSize = 120): string
+    {
+        $prev    = error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+        $ecLevel = \BaconQrCode\Common\ErrorCorrectionLevel::M();
+        error_reporting($prev);
+
+        $qrCode  = \BaconQrCode\Encoder\Encoder::encode($content, $ecLevel, 'ISO-8859-1');
+        $matrix  = $qrCode->getMatrix();
+        $modules = $matrix->getWidth();
+
+        $quiet    = 4;
+        $total    = $modules + $quiet * 2;
+        $cell     = max(1, (int) floor($targetSize / $total));
+        $size     = $total * $cell;
+
+        $img   = imagecreatetruecolor($size, $size);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+        imagefill($img, 0, 0, $white);
+
+        for ($row = 0; $row < $modules; $row++) {
+            for ($col = 0; $col < $modules; $col++) {
+                if ($matrix->get($col, $row) !== 0) {
+                    $x1 = ($col + $quiet) * $cell;
+                    $y1 = ($row + $quiet) * $cell;
+                    imagefilledrectangle($img, $x1, $y1, $x1 + $cell - 1, $y1 + $cell - 1, $black);
+                }
+            }
+        }
+
+        ob_start();
+        imagepng($img);
+        $png = ob_get_clean();
+        imagedestroy($img);
+
+        if (empty($png)) {
+            throw new \RuntimeException('GD imagepng() returned empty');
+        }
+
+        return 'data:image/png;base64,' . base64_encode($png);
     }
 }
