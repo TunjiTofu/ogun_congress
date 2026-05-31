@@ -31,7 +31,7 @@
 <body>
 <div class="wrap">
     <div class="hd">
-        <h1>&#128178; New Batch Payment Submitted</h1>
+        <h1>&#8358; New Batch Payment Submitted</h1>
         <p>Ogun Conference Youth Congress 2026 &mdash; Registration System</p>
     </div>
     <div class="gold-bar"></div>
