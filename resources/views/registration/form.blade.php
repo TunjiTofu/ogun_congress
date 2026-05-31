@@ -84,17 +84,43 @@
             async openCamera() {
                 this.cameraOpen = true;
                 await this.$nextTick();
-                try {
-                    this._stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: this._facingMode, width:{ideal:640}, height:{ideal:640} },
-                        audio: false,
-                    });
-                    this.$refs.videoEl.srcObject = this._stream;
-                } catch(err) {
+
+                // Stop any existing stream first
+                if (this._stream) {
+                    this._stream.getTracks().forEach(t => t.stop());
+                    this._stream = null;
+                }
+
+                // Fallback chain: exact facingMode → ideal facingMode → any camera
+                // 'exact' is required to actually force the rear camera on most phones;
+                // without it, browsers often ignore facingMode and stay on front camera.
+                const attempts = [
+                    { video: { facingMode: { exact: this._facingMode }, width: { ideal: 640 }, height: { ideal: 640 } } },
+                    { video: { facingMode: this._facingMode,            width: { ideal: 640 }, height: { ideal: 640 } } },
+                    { video: true },
+                ];
+
+                let opened = false;
+                for (const attempt of attempts) {
+                    try {
+                        this._stream = await navigator.mediaDevices.getUserMedia({ ...attempt, audio: false });
+                        this.$refs.videoEl.srcObject = this._stream;
+                        opened = true;
+                        break;
+                    } catch (e) { /* try next */ }
+                }
+
+                if (!opened) {
                     this.cameraOpen      = false;
                     this.cameraAvailable = false;
-                    alert('Camera access denied. Please use the file upload option, or allow camera access in your browser settings and try again.');
+                    alert('Camera unavailable. Please use the file upload option instead.');
+                    return;
                 }
+
+                // Re-enumerate after permission granted — labels now populated
+                navigator.mediaDevices.enumerateDevices().then(devices => {
+                    this.hasFrontAndBack = devices.filter(d => d.kind === 'videoinput').length > 1;
+                }).catch(() => {});
             },
             closeCamera() {
                 this.cameraOpen = false;
@@ -376,8 +402,8 @@
                                 </button>
                             </div>
                             <p class="text-xs text-gray-500 text-center">
-                                <button type="button" @click="flipCamera()" class="underline" x-show="hasFrontAndBack">
-                                    Flip camera
+                                <button type="button" @click="flipCamera()" class="underline text-navy text-sm font-medium">
+                                    ↻ Flip camera
                                 </button>
                             </p>
                         </div>
