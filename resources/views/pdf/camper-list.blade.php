@@ -78,6 +78,7 @@
                 <th style="width:18mm">Category</th>
                 <th style="width:18mm">Rank</th>
                 <th style="width:14mm">Gender</th>
+                <th style="width:12mm">T-Shirt</th>
                 <th style="width:12mm">Consent</th>
             </tr>
             </thead>
@@ -90,6 +91,7 @@
                     <td>{{ $camper->category?->label() }}</td>
                     <td>{{ $camper->club_rank ?? '—' }}</td>
                     <td>{{ ucfirst($camper->gender?->value ?? '—') }}</td>
+                    <td>{{ $camper->tshirt_size ?? '—' }}</td>
                     <td>{{ $camper->consent_collected ? '✓' : '—' }}</td>
                 </tr>
             @endforeach

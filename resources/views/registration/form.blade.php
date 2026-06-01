@@ -172,6 +172,9 @@
                 if (!document.querySelector('input[name="gender"]:checked')) {
                     this.validationError = 'Please select your gender.'; return false;
                 }
+                if (!document.querySelector('input[name="tshirt_size"]:checked')) {
+                    this.validationError = 'Please select your T-shirt size.'; return false;
+                }
                 if (!this.photoPreview && !this.capturedDataUrl) {
                     this.validationError = 'Please upload or capture a passport photo.'; return false;
                 }
@@ -224,6 +227,26 @@
     }
 
     /* Camera methods merged into main wizard component above */
+
+    /* ── T-Shirt size pill selection ── */
+    function selectTshirt(label) {
+        document.querySelectorAll('#tshirt-grid .tshirt-pill').forEach(function(pill) {
+            pill.classList.remove('bg-navy', 'text-white', 'border-navy');
+            pill.classList.add('border-gray-200', 'text-gray-600');
+        });
+        var pill = label.querySelector('.tshirt-pill');
+        if (pill) {
+            pill.classList.add('bg-navy', 'text-white', 'border-navy');
+            pill.classList.remove('border-gray-200', 'text-gray-600');
+        }
+        var radio = label.querySelector('input[type=radio]');
+        if (radio) radio.checked = true;
+    }
+    // Restore on page load (after validation failure with old() value)
+    document.addEventListener('DOMContentLoaded', function() {
+        var checked = document.querySelector('#tshirt-grid input[type=radio]:checked');
+        if (checked) selectTshirt(checked.closest('label'));
+    });
 </script>
 
 <div class="min-h-screen bg-gray-50 py-8 px-4">
@@ -316,6 +339,30 @@
                             @endforeach
                         </div>
                         @error('gender')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
+                    </div>
+
+                    {{-- T-Shirt Size --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            T-Shirt Size <span class="text-red-500">*</span>
+                        </label>
+                        <div class="grid grid-cols-4 gap-2 sm:grid-cols-7" id="tshirt-grid">
+                            @foreach(['XS','S','M','L','XL','XXL','XXXL'] as $size)
+                                <label class="cursor-pointer" onclick="selectTshirt(this)">
+                                    <input type="radio" name="tshirt_size" value="{{ $size }}"
+                                           {{ old('tshirt_size')===$size ? 'checked' : '' }} required
+                                           class="sr-only"/>
+                                    <span class="tshirt-pill flex items-center justify-center h-10 rounded-xl
+                                             border-2 font-semibold text-sm transition-all
+                                             {{ old('tshirt_size')===$size
+                                                ? 'bg-navy text-white border-navy'
+                                                : 'border-gray-200 text-gray-600 hover:border-navy' }}">
+                                    {{ $size }}
+                                </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        @error('tshirt_size')<p class="text-red-600 text-xs mt-1">{{ $message }}</p>@enderror
                     </div>
 
                     {{-- Passport Photo with Upload + Live Camera --}}

@@ -76,6 +76,8 @@ class AdminImportAction extends Action
                     $role        = strtolower(trim($row[2] ?? ''));
                     $churchName  = trim($row[3] ?? '');
                     $districtName= trim($row[4] ?? '');
+                    $phone       = trim($row[5] ?? '');
+
 
                     // Look up IDs by name (case-insensitive)
                     $churchId   = $churchName
@@ -109,6 +111,7 @@ class AdminImportAction extends Action
                         'password'           => Hash::make($plainPwd),
                         'temp_password'      => $plainPwd,
                         'must_change_password'=> true,
+                        'phone'              => $phone ?: null,
                         'church_id'          => $churchId,
                         'district_id'        => $districtId,
                         'is_active'          => true,

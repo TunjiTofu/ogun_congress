@@ -26,6 +26,7 @@ class RegistrationService
     /**
      * Validate an incoming registration code and return prefill data.
      *
+     * @param string $code
      * @return array
      * @throws ValidationException
      */
@@ -112,6 +113,7 @@ class RegistrationService
                 'gender'               => $data['gender'],
                 'category'             => $category,
                 'home_address'         => $data['home_address'] ?? null,
+                'tshirt_size'          => $data['tshirt_size'] ?? null,
                 'church_id'            => $registrationCode->prefill_church_id ?? $data['church_id'],
                 'ministry'             => $data['ministry'] ?? null,
                 'club_rank'            => $data['club_rank'] ?? null,

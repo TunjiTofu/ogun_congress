@@ -5,8 +5,6 @@ namespace App\Filament\Resources;
 use App\Enums\CamperCategory;
 use App\Enums\Gender;
 use App\Filament\Resources\CamperResource\Pages;
-use App\Filament\Resources\CamperResource\RelationManagers\CheckinEventsRelationManager;
-use App\Filament\Resources\CamperResource\RelationManagers\ContactsRelationManager;
 use App\Models\Camper;
 use App\Models\Church;
 use App\Models\District;
@@ -32,7 +30,7 @@ class CamperResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'secretariat', 'camp_director']);
+        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'camp_director', 'admin']);
     }
 
     public static function getEloquentQuery(): Builder
@@ -100,6 +98,7 @@ class CamperResource extends Resource
                     Infolists\Components\TextEntry::make('club_rank')->label('Club Rank')->placeholder('—'),
                     Infolists\Components\TextEntry::make('ministry')->label('Ministry')->placeholder('—'),
                     Infolists\Components\TextEntry::make('home_address')->placeholder('—')->columnSpanFull(),
+                    Infolists\Components\TextEntry::make('tshirt_size')->label('T-Shirt Size')->placeholder('—')->badge(),
                 ]),
 
             // ── Church ────────────────────────────────────────────────────
@@ -292,6 +291,9 @@ class CamperResource extends Resource
                         ->options(collect(Gender::cases())
                             ->mapWithKeys(fn ($e) => [$e->value => $e->label()])->toArray()),
                     Forms\Components\Textarea::make('home_address')->rows(2)->columnSpanFull(),
+                    Forms\Components\Select::make('tshirt_size')->label('T-Shirt Size')
+                        ->options(['XS'=>'XS','S'=>'S','M'=>'M','L'=>'L','XL'=>'XL','XXL'=>'XXL','XXXL'=>'XXXL'])
+                        ->required()->native(false),
                 ]),
 
             Forms\Components\Section::make('Church & Ministry')
@@ -368,6 +370,10 @@ class CamperResource extends Resource
 
                 Tables\Columns\TextColumn::make('club_rank')
                     ->label('Rank')->placeholder('—')->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('tshirt_size')
+                    ->label('T-Shirt')->placeholder('—')->badge()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('church.district.name')
@@ -518,10 +524,23 @@ class CamperResource extends Resource
                 Tables\Actions\Action::make('regenerate')
                     ->label('Regenerate Docs')
                     ->icon('heroicon-o-arrow-path')->color('gray')
-                    ->visible($isSuperAdmin)->requiresConfirmation()
+                    ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'admin']))
+                    ->requiresConfirmation()
+                    ->modalDescription(fn (Camper $r) =>
+                        'Re-generate ID card' .
+                        ($r->requiresConsentForm() ? ' + consent form' : '') .
+                        ' for ' . $r->full_name .
+                        '. Category: ' . ($r->category?->value ?? '—') .
+                        ' | Needs consent: ' . ($r->requiresConsentForm() ? 'YES' : 'No') .
+                        ' | DOB: ' . ($r->date_of_birth ? $r->date_of_birth->format('d M Y') : 'not set')
+                    )
                     ->action(function (Camper $r) {
                         \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id);
-                        Notification::make()->title('Queued.')->success()->send();
+                        Notification::make()
+                            ->title('Document generation queued for ' . $r->full_name)
+                            ->body('Needs consent form: ' . ($r->requiresConsentForm() ? 'YES' : 'No'))
+                            ->success()
+                            ->send();
                     }),
 
                 // Mark as official
@@ -637,10 +656,11 @@ class CamperResource extends Resource
     public static function getRelationManagers(): array
     {
         return [
-            ContactsRelationManager::class,
-            CheckinEventsRelationManager::class,
+            \App\Filament\Resources\CamperResource\RelationManagers\ContactsRelationManager::class,
+            \App\Filament\Resources\CamperResource\RelationManagers\CheckinEventsRelationManager::class,
         ];
     }
+
 
     public static function canDeleteAny(): bool
     {

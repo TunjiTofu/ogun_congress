@@ -6,11 +6,7 @@ use App\Filament\Resources\CamperResource;
 use App\Models\Camper;
 use App\Models\Church;
 use App\Models\District;
-use App\Enums\CamperCategory;
-use Filament\Actions;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Illuminate\Support\HtmlString;
 
 class ListCampers extends ListRecords
 {
