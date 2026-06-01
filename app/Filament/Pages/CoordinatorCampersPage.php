@@ -26,6 +26,7 @@ class CoordinatorCampersPage extends Page implements HasTable
     protected static ?string $navigationGroup = 'Campers';
     protected static ?int    $navigationSort  = 1;
     protected static string  $view            = 'filament.pages.coordinator-campers';
+    protected static ?string $title           = 'My Campers';
 
     public static function canAccess(): bool
     {
@@ -116,6 +117,9 @@ class CoordinatorCampersPage extends Page implements HasTable
 
                 Tables\Columns\TextColumn::make('club_rank')
                     ->label('Rank')->placeholder('—'),
+
+                Tables\Columns\TextColumn::make('tshirt_size')
+                    ->label('T-Shirt')->placeholder('—'),
 
                 Tables\Columns\TextColumn::make('church.name')
                     ->label('Church')->sortable()
