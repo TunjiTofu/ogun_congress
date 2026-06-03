@@ -25,6 +25,7 @@ class SubmitRegistrationRequest extends FormRequest
             // Step 1 — Personal
             'date_of_birth'         => ['nullable', 'date', 'before:today', 'after:' . now()->subYears(100)->toDateString()],
             'gender'                => ['required', new Enum(Gender::class)],
+            'tshirt_size'           => ['required', 'string', Rule::in(['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'])],
             'home_address'          => ['nullable', 'string', 'max:500'],
             'photo'                 => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
             'photo_data_url'        => ['nullable', 'string'], // base64 data URL from live camera
@@ -66,6 +67,8 @@ class SubmitRegistrationRequest extends FormRequest
             'parent_phone.regex'          => 'Please enter a valid Nigerian phone number.',
             'emergency_phone.regex'       => 'Please enter a valid Nigerian phone number.',
             'doctor_phone.regex'          => 'Please enter a valid Nigerian phone number.',
+            'tshirt_size.required'        => 'Please select your T-shirt size.',
+            'tshirt_size.in'              => 'Please select a valid T-shirt size.',
         ];
     }
 }

@@ -34,6 +34,7 @@ class Camper extends Model implements HasMedia
             'gender'            => Gender::class,
             'category'          => CamperCategory::class,
             'consent_collected' => 'boolean',
+            'is_official'       => 'boolean',  // added
         ];
     }
 
