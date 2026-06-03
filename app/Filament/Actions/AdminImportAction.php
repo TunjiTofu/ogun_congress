@@ -57,7 +57,7 @@ class AdminImportAction extends Action
                 }
 
                 $validRoles = ['super_admin','accountant','secretariat','security',
-                    'church_coordinator','camp_director','district_coordinator'];
+                    'church_coordinator','camp_director','district_coordinator', 'admin'];
 
                 $spreadsheet = IOFactory::load($path);
                 $sheet       = $spreadsheet->getActiveSheet();
