@@ -63,7 +63,8 @@
 <div class="wrapper">
     <div class="header">
 {{--        <img src="{{ url('/images/congress_logo.png') }}" alt="Congress Logo" class="header-logo"/>--}}
-        <img src="{{ url('https://res.cloudinary.com/dhxz1zt0j/image/upload/v1779953796/congress_logo_chy6td.png') }}" alt="Congress Logo" class="header-logo"/>
+{{--        <img src="{{ url('https://res.cloudinary.com/dhxz1zt0j/image/upload/v1779953796/congress_logo_chy6td.png') }}" alt="Congress Logo" class="header-logo"/>--}}
+        <img src="{{ url('https://res.cloudinary.com/dhxz1zt0j/image/upload/v1780590829/congress_logo_hcf6rf.png') }}" alt="Congress Logo" class="header-logo"/>
         <h1>Ogun Conference Youth Congress 2026</h1>
         <p>Registration & Monitoring System — Admin Portal</p>
     </div>
