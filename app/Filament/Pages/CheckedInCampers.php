@@ -181,7 +181,7 @@ class CheckedInCampers extends Page implements HasTable
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
             ])
-            ->paginated([25, 50, 100])
-            ->poll('30s');
+            ->paginated([25, 50, 100]);
+//            ->poll('30s');
     }
 }

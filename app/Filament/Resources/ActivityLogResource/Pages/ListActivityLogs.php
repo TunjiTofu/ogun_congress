@@ -11,6 +11,6 @@ class ListActivityLogs extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return []; // read-only — no create
+        return []; // read-only — no create.
     }
 }
