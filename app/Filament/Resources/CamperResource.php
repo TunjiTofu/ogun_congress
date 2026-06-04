@@ -54,8 +54,11 @@ class CamperResource extends Resource
                         ->label('Passport Photo')
                         ->columnSpanFull()
                         ->getStateUsing(function (Camper $record): string {
-                            $url = $record->getFirstMedia('photo')
-                                ? route('camper.photo', $record->id) : null;
+                            $media = $record->getFirstMedia('photo');
+                            // Use direct storage URL — no PHP process needed
+                            $url = $media
+                                ? ($media->getUrl('thumb') ?: $media->getUrl())
+                                : null;
                             if (! $url) {
                                 return '<div style="width:120px;height:150px;border-radius:10px;background:#F1F5F9;'
                                     . 'display:flex;align-items:center;justify-content:center;font-size:3rem;'
@@ -260,7 +263,9 @@ class CamperResource extends Resource
                                     . 'background:#F1F5F9;display:flex;align-items:center;justify-content:center;'
                                     . 'font-size:2.5rem;color:#94A3B8;border:2px solid #E2E8F0">👤</div>');
                             }
-                            return new HtmlString('<img src="' . e(route('camper.photo', $record->id)) . '" '
+                            $photoUrl = $record->getFirstMedia('photo')?->getUrl('thumb')
+                                ?? $record->getFirstMedia('photo')?->getUrl();
+                            return new HtmlString('<img src="' . e($photoUrl) . '" '
                                 . 'style="width:100px;height:125px;border-radius:10px;object-fit:cover;'
                                 . 'object-position:top center;border:2px solid #E2E8F0">');
                         }),
@@ -347,8 +352,11 @@ class CamperResource extends Resource
             ->columns([
                 Tables\Columns\ImageColumn::make('photo')
                     ->circular()
-                    ->getStateUsing(fn (Camper $r) => $r->getFirstMedia('photo')
-                        ? route('camper.photo', $r->id) : null),
+                    ->getStateUsing(fn (Camper $r) =>
+                        // Serve directly from public disk — avoids a PHP process per image
+                        $r->getFirstMedia('photo')?->getUrl('thumb')
+                        ?? $r->getFirstMedia('photo')?->getUrl()
+                    ),
 
                 Tables\Columns\TextColumn::make('full_name')
                     ->searchable()->sortable()->weight('bold'),
