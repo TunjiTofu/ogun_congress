@@ -8,19 +8,28 @@ use App\Models\OfflinePayment;
 use App\Models\RegistrationCode;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\Cache;
 
 class StatsOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
     protected int|string|array $columnSpan = 'full';
-    protected static ?string $pollingInterval = '30s';
+
+    // Reduced from 30s — each poll runs 10+ DB queries.
+    // Stats are cached for 90s so concurrent admin users share one DB hit.
+    protected static ?string $pollingInterval = '120s';
 
     protected function getStats(): array
     {
-        $total        = Camper::count();
-        $adventurers  = Camper::where('category', 'adventurer')->count();
-        $pathfinders  = Camper::where('category', 'pathfinder')->count();
-        $seniorYouth  = Camper::where('category', 'senior_youth')->count();
+        return Cache::remember('filament.stats_overview', 90, fn () => $this->computeStats());
+    }
+
+    private function computeStats(): array
+    {
+        $total       = Camper::count();
+        $adventurers = Camper::where('category', 'adventurer')->count();
+        $pathfinders = Camper::where('category', 'pathfinder')->count();
+        $seniorYouth = Camper::where('category', 'senior_youth')->count();
 
         $checkedIn = CheckinEvent::selectRaw('camper_id')
             ->whereIn('id', fn ($sub) =>
@@ -29,17 +38,14 @@ class StatsOverviewWidget extends BaseWidget
                 ->groupBy('camper_id'))
             ->where('event_type', 'check_in')->count();
 
-        $pendingOffline   = OfflinePayment::where('status', 'pending')->count();
-        $activeCodes      = RegistrationCode::where('status', 'ACTIVE')->count();
-        $consentPending   = Camper::whereIn('category', ['adventurer', 'pathfinder'])
+        $pendingOffline = OfflinePayment::where('status', 'pending')->count();
+        $activeCodes    = RegistrationCode::where('status', 'ACTIVE')->count();
+        $consentPending = Camper::whereIn('category', ['adventurer', 'pathfinder'])
             ->where('consent_collected', false)->count();
-        $photosPending    = Camper::where('photo_status', 'pending')
+        $photosPending  = Camper::where('photo_status', 'pending')
             ->whereHas('media', fn ($q) => $q->where('collection_name', 'photo'))->count();
-        $photosRejected   = Camper::where('photo_status', 'rejected')->count();
-        $officials        = Camper::where('is_official', true)->count();
-
-        // Trend: registrations last 7 days
-        $last7 = Camper::where('created_at', '>=', now()->subDays(7))->count();
+        $photosRejected = Camper::where('photo_status', 'rejected')->count();
+        $last7          = Camper::where('created_at', '>=', now()->subDays(7))->count();
 
         return [
             Stat::make('Total Registered', number_format($total))

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnforceCampOver;
 use App\Http\Middleware\ExtractBearerToken;
+use App\Http\Middleware\GzipResponse;
 use App\Http\Middleware\SetAppTimezone;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -43,6 +44,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission'         => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
+
+        // Gzip compress web responses — reduces bandwidth by 60-80%
+        $middleware->appendToGroup('web', GzipResponse::class);
 
         // Force-logout non-super_admin when camp is over
         $middleware->appendToGroup('web', EnforceCampOver::class);

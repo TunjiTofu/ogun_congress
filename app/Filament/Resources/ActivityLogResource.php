@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ActivityLogResource\Pages\ListActivityLogs;
+use App\Models\User;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -115,13 +116,13 @@ class ActivityLogResource extends Resource
                 Tables\Filters\SelectFilter::make('causer_id')
                     ->label('User')
                     ->options(
-                        \App\Models\User::orderBy('name')
+                        User::orderBy('name')
                             ->pluck('name', 'id')
                             ->toArray()
                     ),
             ])
             ->defaultSort('created_at', 'desc')
-            ->poll('30s')
+//            ->poll('120s')
             ->actions([]) // read-only
             ->bulkActions([]);
     }
