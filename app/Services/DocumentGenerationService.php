@@ -124,7 +124,9 @@ class DocumentGenerationService
      */
     private function generateQrCode(string $camperNumber, ?int $camperId = null): string
     {
-        $content = 'OGN:' . $camperNumber;
+        // Encode a full URL so phone cameras open /verify directly when scanned.
+        // The checkin PWA handles OGN: prefix; phone cameras need a real URL.
+        $content = url('/verify/' . $camperNumber);
 
         try {
             $png = $this->generateQrPngWithGd($content, 200);
