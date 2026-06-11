@@ -26,7 +26,7 @@ class GenerateBulkIdCardsJob implements ShouldQueue
     private array $departmentColors = [
         'pathfinder'   => '#2D7A3A',
         'adventurer'   => '#1B3A8F',
-        'senior_youth' => '#C9A94D',
+        'senior_youth' => '#875216',
     ];
 
     public function __construct(

@@ -20,7 +20,7 @@ class BulkIdCardController extends Controller
     private array $departmentColors = [
         'pathfinder'   => '#2D7A3A',
         'adventurer'   => '#1B3A8F',
-        'senior_youth' => '#C9A94D',
+        'senior_youth' => '#875216',
     ];
 
     // ── Main export entry point ──────────────────────────────────────────────
