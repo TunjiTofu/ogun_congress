@@ -205,7 +205,7 @@ class GenerateBulkIdCardsJob implements ShouldQueue
     private function encodeQr(Camper $c): ?string
     {
         try {
-            return $this->generateQrPngWithGd('OGN:' . $c->camper_number, 120);
+            return $this->generateQrPngWithGd(url('/verify/' . $c->camper_number), 120);
         } catch (\Throwable $e) {
             Log::warning('bulk_id_card.qr_encode_failed', ['camper' => $c->id, 'error' => $e->getMessage()]);
             return null;
