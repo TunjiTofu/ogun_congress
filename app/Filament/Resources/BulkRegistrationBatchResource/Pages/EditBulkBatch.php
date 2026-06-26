@@ -43,6 +43,12 @@ class EditBulkBatch extends EditRecord
         return $data;
     }
 
+    protected function getRedirectUrl(): string
+    {
+        // Always return to the draft tab so coordinators can see unsent batches
+        return $this->getResource()::getUrl('index') . '?activeTab=draft';
+    }
+
     protected function afterSave(): void
     {
         if ($this->record->isDraft() || $this->record->isPendingPayment()) {
@@ -89,3 +95,4 @@ class EditBulkBatch extends EditRecord
         }
     }
 }
+
