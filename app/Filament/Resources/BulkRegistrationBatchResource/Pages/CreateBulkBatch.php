@@ -67,7 +67,22 @@ class CreateBulkBatch extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
+        // Coordinators go to the list so they can see the draft banner
+        // and know they still need to submit for payment.
+        if (auth()->user()->hasRole('church_coordinator')) {
+            return $this->getResource()::getUrl('index');
+        }
+
+        // Admins/accountants go straight to edit
         return $this->getResource()::getUrl('edit', ['record' => $this->record]);
+    }
+
+    protected function getSavedNotificationTitle(): ?string
+    {
+        if (auth()->user()->hasRole('church_coordinator')) {
+            return 'Batch created! Please review it and submit for payment when ready.';
+        }
+        return 'Batch created successfully.';
     }
 }
 

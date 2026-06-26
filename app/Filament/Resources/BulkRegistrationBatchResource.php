@@ -58,8 +58,6 @@ class BulkRegistrationBatchResource extends Resource
 
             Forms\Components\Section::make('Batch Details')
                 ->schema([
-                    // Coordinator: church is auto-set from their profile (read-only)
-                    // Super admin / accountant: can select
                     Forms\Components\Select::make('district_id')
                         ->label('District')
                         ->options(District::orderBy('name')->pluck('name', 'id'))
@@ -79,7 +77,6 @@ class BulkRegistrationBatchResource extends Resource
                         ->hidden(fn () => auth()->user()->hasRole('church_coordinator'))
                         ->disabled(fn ($record) => $record && $record->status === 'confirmed'),
 
-                    // Read-only church display for coordinators
                     Forms\Components\Placeholder::make('church_display')
                         ->label('Your Church')
                         ->content(fn () => auth()->user()->church?->name ?? '—')
@@ -96,7 +93,6 @@ class BulkRegistrationBatchResource extends Resource
                         ->disabled(fn ($record) => $record && $record->status === 'confirmed'),
                 ])->columns(2),
 
-            // Bank transfer details (filled when submitting for payment)
             Forms\Components\Section::make('Payment Details')
                 ->schema([
                     Forms\Components\TextInput::make('bank_name')
@@ -144,21 +140,18 @@ class BulkRegistrationBatchResource extends Resource
                 ->columns(2)
                 ->collapsed(fn ($record) => $record?->isDraft()),
 
-            // Camper entries (repeater)
             Forms\Components\Section::make('Campers in This Batch')
                 ->schema([
                     Forms\Components\Placeholder::make('total_display')
                         ->label('Expected Total')
                         ->content(function ($record, $get) {
-                            // Try from saved record first
                             if ($record && $record->expected_total > 0) {
                                 $count = $record->entries()->count();
                                 return '₦' . number_format($record->expected_total, 2) . " ({$count} camper" . ($count !== 1 ? 's' : '') . ')';
                             }
-                            // Try to calculate from live form data
                             $entries = $get('entries') ?? [];
-                            $total = collect($entries)->sum(fn ($e) => (float)($e['fee'] ?? 0));
-                            $count = count($entries);
+                            $total   = collect($entries)->sum(fn ($e) => (float)($e['fee'] ?? 0));
+                            $count   = count($entries);
                             if ($count > 0) {
                                 return '₦' . number_format($total, 2) . " ({$count} camper" . ($count !== 1 ? 's' : '') . ')';
                             }
@@ -208,12 +201,10 @@ class BulkRegistrationBatchResource extends Resource
                                 ->disabled()
                                 ->dehydrated(),
 
-                            // Fix: eager-load registrationCode to avoid lazy loading violation
                             Forms\Components\Placeholder::make('code_issued')
                                 ->label('Code')
                                 ->content(function ($record) {
                                     if (! $record?->id) return '—';
-                                    // Reload with eager-loaded relationship to avoid lazy loading
                                     $entry = \App\Models\BulkRegistrationEntry::with('registrationCode')
                                         ->find($record->id);
                                     return $entry?->registrationCode?->code ?? '—';
@@ -225,7 +216,6 @@ class BulkRegistrationBatchResource extends Resource
                         ->reorderable(false)
                         ->live()
                         ->afterStateUpdated(function ($state, \Filament\Forms\Set $set) {
-                            // Validate uniqueness within the batch: same name+phone+category is not allowed
                             if (! is_array($state)) return;
 
                             $seen  = [];
@@ -247,7 +237,6 @@ class BulkRegistrationBatchResource extends Resource
                                 }
                             }
 
-                            // Store duplicate names in a hidden field for display
                             if (! empty($dupes)) {
                                 $set('duplicate_warning', 'Duplicate entries detected: ' . implode(', ', array_unique($dupes)) . '. Each camper must have a unique name, phone, and category combination.');
                             } else {
@@ -257,7 +246,6 @@ class BulkRegistrationBatchResource extends Resource
                         ->disabled(fn ($record) => $record && $record->status === 'confirmed')
                         ->minItems(1),
 
-                    // Duplicate warning banner
                     Forms\Components\Placeholder::make('duplicate_warning')
                         ->label('')
                         ->content(fn ($state) => $state ?? '')
@@ -271,12 +259,16 @@ class BulkRegistrationBatchResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function ($query) {
-                // Church coordinators only see their own church's batches
-                if (auth()->user()->hasRole('church_coordinator')) {
-                    // Find the church linked to this coordinator via their user record
-                    // Coordinators are linked to churches via the church_coordinator_users pivot (if exists)
-                    // For now, filter by batches they created
-                    $query->where('created_by', auth()->id());
+                $user = auth()->user();
+
+                // Coordinators only see their own batches
+                if ($user->hasRole('church_coordinator')) {
+                    $query->where('created_by', $user->id);
+                }
+
+                // Accountants never see drafts — they only act on submitted batches
+                if ($user->hasRole('accountant') && ! $user->hasAnyRole(['super_admin', 'admin'])) {
+                    $query->where('status', '!=', 'draft');
                 }
             })
             ->columns([
@@ -309,12 +301,18 @@ class BulkRegistrationBatchResource extends Resource
                         'success' => 'confirmed',
                         'danger'  => 'rejected',
                     ])
-                    ->formatStateUsing(fn ($state) => match($state) {
-                        'draft'           => 'Draft',
-                        'pending_payment' => 'Pending Payment',
-                        'confirmed'       => 'Confirmed',
-                        'rejected'        => 'Rejected',
-                        default           => $state,
+                    ->formatStateUsing(function ($state, $record) {
+                        $label = match($state) {
+                            'draft'           => '⚠ Draft',
+                            'pending_payment' => 'Pending Payment',
+                            'confirmed'       => 'Confirmed',
+                            'rejected'        => 'Rejected',
+                            default           => $state,
+                        };
+                        if ($state === 'draft' && auth()->user()->hasRole('church_coordinator')) {
+                            return $label . ' — Submit for payment';
+                        }
+                        return $label;
                     }),
 
                 Tables\Columns\TextColumn::make('createdBy.name')
@@ -350,7 +348,13 @@ class BulkRegistrationBatchResource extends Resource
                     ->visible(fn () => auth()->user()->hasRole('accountant')
                         && ! auth()->user()->hasRole('super_admin')),
 
+                // Edit — shown as a prominent button for coordinators on draft batches
                 Tables\Actions\EditAction::make()
+                    ->button()
+                    ->label(fn ($record) => $record?->status === 'draft'
+                        ? 'Edit Batch'
+                        : 'Edit')
+                    ->color(fn ($record) => $record?->status === 'draft' ? 'primary' : 'gray')
                     ->visible(fn ($record) => (! auth()->user()->hasRole('accountant')
                             || auth()->user()->hasRole('super_admin'))
                         && $record?->status !== 'confirmed'),
@@ -369,6 +373,7 @@ class BulkRegistrationBatchResource extends Resource
                     ->label('Pay with Paystack')
                     ->icon('heroicon-o-credit-card')
                     ->color('success')
+                    ->button()
                     ->requiresConfirmation()
                     ->modalHeading('Pay with Paystack?')
                     ->modalDescription(fn (BulkRegistrationBatch $r) =>
@@ -392,7 +397,6 @@ class BulkRegistrationBatchResource extends Resource
                                 ->title('Redirecting to Paystack...')
                                 ->body('You will be redirected to complete payment.')
                                 ->success()->send();
-                            // Redirect via Filament JS redirect
                             redirect()->away($result['authorization_url'])->send();
                             exit;
                         } catch (\Throwable $e) {
@@ -400,11 +404,12 @@ class BulkRegistrationBatchResource extends Resource
                         }
                     }),
 
-                // Submit for offline payment
+                // Submit for offline payment — prominent warning button
                 Tables\Actions\Action::make('submit_offline')
-                    ->label('Submit for Offline Payment')
+                    ->label('Submit for Payment Confirmation')
                     ->icon('heroicon-o-building-library')
                     ->color('warning')
+                    ->button()
                     ->requiresConfirmation()
                     ->modalHeading('Submit for Bank Transfer Payment?')
                     ->modalDescription(fn (BulkRegistrationBatch $r) =>
@@ -429,6 +434,7 @@ class BulkRegistrationBatchResource extends Resource
                     ->label('Confirm Payment')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
+                    ->button()
                     ->form([
                         Forms\Components\Placeholder::make('expected_total_display')
                             ->label('Expected Total')
@@ -453,7 +459,6 @@ class BulkRegistrationBatchResource extends Resource
                         auth()->user()->hasAnyRole(['accountant', 'super_admin']))
                     ->action(function (BulkRegistrationBatch $record, array $data, BulkRegistrationService $service) {
                         try {
-                            // Refresh expected total from actual entries before confirming
                             $record->recalculateTotal();
                             $record->refresh();
                             $service->confirmBatch($record, (float) $data['amount_paid'], auth()->id());
@@ -470,6 +475,7 @@ class BulkRegistrationBatchResource extends Resource
                     ->label('Reject')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
+                    ->button()
                     ->form([
                         Forms\Components\Textarea::make('rejection_reason')
                             ->label('Reason for Rejection')
@@ -512,7 +518,6 @@ class BulkRegistrationBatchResource extends Resource
         ];
     }
 
-    // Route accountants to the view page, coordinators/admins to edit
     public static function getRecordUrl(\Illuminate\Database\Eloquent\Model $record): ?string
     {
         $user = auth()->user();
