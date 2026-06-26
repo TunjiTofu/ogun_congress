@@ -23,7 +23,7 @@ class RegistrationCodeResource extends Resource
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['accountant', 'super_admin']);
+        return auth()->user()->hasAnyRole(['accountant', 'super_admin', 'church_coordinator', 'admin']);
     }
 
     public static function canCreate(): bool
@@ -139,7 +139,11 @@ class RegistrationCodeResource extends Resource
                     ->icon('heroicon-o-no-symbol')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (RegistrationCode $r) => $r->status === CodeStatus::ACTIVE)
+                    // Church coordinators can view codes but cannot void them
+                    ->visible(fn (RegistrationCode $r) =>
+                        $r->status === CodeStatus::ACTIVE
+                        && ! auth()->user()->hasRole('church_coordinator')
+                    )
                     ->action(fn (RegistrationCode $record) => $record->update([
                         'status' => CodeStatus::VOID,
                     ])),
