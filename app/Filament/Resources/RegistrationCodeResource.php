@@ -75,6 +75,34 @@ class RegistrationCodeResource extends Resource
                     ->label('Phone')
                     ->searchable(),
 
+                Tables\Columns\TextColumn::make('prefill_category')
+                    ->label('Department')
+                    ->formatStateUsing(fn ($state) => match($state) {
+                        'adventurer'   => 'Adventurer',
+                        'pathfinder'   => 'Pathfinder',
+                        'senior_youth' => 'Senior Youth',
+                        default        => $state ?? '—',
+                    })
+                    ->badge()
+                    ->color(fn ($state) => match($state) {
+                        'adventurer'   => 'info',
+                        'pathfinder'   => 'success',
+                        'senior_youth' => 'warning',
+                        default        => 'gray',
+                    })
+                    ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'admin'])),
+
+                Tables\Columns\TextColumn::make('church.name')
+                    ->label('Church')
+                    ->searchable()
+                    ->placeholder('—')
+                    ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'admin'])),
+
+                Tables\Columns\TextColumn::make('church.district.name')
+                    ->label('District')
+                    ->placeholder('—')
+                    ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'admin'])),
+
                 Tables\Columns\TextColumn::make('amount_paid')
                     ->label('Amount')
                     ->money('NGN')

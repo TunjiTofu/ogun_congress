@@ -16,6 +16,46 @@ class SubmitRegistrationRequest extends FormRequest
         return true;
     }
 
+    /**
+     * Normalise phone numbers before validation:
+     * - Strip all spaces (e.g. "080 1234 5678" → "08012345678")
+     * - Convert 234xxxxxxxxxx → 0xxxxxxxxxx
+     * - Convert +234xxxxxxxxxx → 0xxxxxxxxxx
+     */
+    protected function prepareForValidation(): void
+    {
+        $phoneFields = ['parent_phone', 'emergency_phone', 'doctor_phone'];
+
+        $data = [];
+        foreach ($phoneFields as $field) {
+            if ($this->has($field) && $this->input($field)) {
+                $data[$field] = $this->normalisePhone($this->input($field));
+            }
+        }
+
+        if (! empty($data)) {
+            $this->merge($data);
+        }
+    }
+
+    private function normalisePhone(string $phone): string
+    {
+        // Remove all spaces
+        $phone = str_replace(' ', '', $phone);
+
+        // Convert +234 → 0
+        if (str_starts_with($phone, '+234')) {
+            $phone = '0' . substr($phone, 4);
+        }
+
+        // Convert 234 (without +) → 0 — only if 13 digits (234 + 10)
+        if (str_starts_with($phone, '234') && strlen($phone) === 13) {
+            $phone = '0' . substr($phone, 3);
+        }
+
+        return $phone;
+    }
+
     public function rules(): array
     {
         return [

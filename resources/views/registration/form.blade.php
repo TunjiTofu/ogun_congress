@@ -128,13 +128,16 @@
             },
             capture() {
                 const video = this.$refs.videoEl, canvas = this.$refs.canvasEl;
-                const size  = 480;
+                // Max 600px — large enough for an ID card photo, small enough to stay
+                // within post_max_size limits. Base64 inflates ~37% so 600px JPEG
+                // at q=0.75 ≈ 40-80KB encoded — well under any server limit.
+                const size  = 600;
                 canvas.width = canvas.height = size;
                 const ctx = canvas.getContext('2d');
                 const vw = video.videoWidth, vh = video.videoHeight;
                 const side = Math.min(vw, vh);
                 ctx.drawImage(video, (vw-side)/2, (vh-side)/2, side, side, 0, 0, size, size);
-                const dataUrl        = canvas.toDataURL('image/jpeg', 0.92);
+                const dataUrl        = canvas.toDataURL('image/jpeg', 0.75); // quality 0.75 — ~60KB
                 this.capturedDataUrl = dataUrl;
                 this.photoPreview    = dataUrl;
                 if (this.$refs.photoData) this.$refs.photoData.value = dataUrl;
