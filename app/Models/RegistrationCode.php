@@ -44,6 +44,11 @@ class RegistrationCode extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function church(): BelongsTo
+    {
+        return $this->belongsTo(Church::class, 'prefill_church_id');
+    }
+
     // ── Scopes ────────────────────────────────────────────────────────────────
 
     public function scopeActive($query)

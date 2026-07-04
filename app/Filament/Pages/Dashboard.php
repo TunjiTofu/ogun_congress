@@ -22,7 +22,23 @@ class Dashboard extends BaseDashboard
 
     public static function canAccess(): bool
     {
-        return auth()->user()->hasAnyRole(['super_admin', 'admin', 'secretariat', 'security']);
+        return auth()->user()->hasAnyRole(['super_admin', 'secretariat', 'security', 'admin']);
+    }
+
+    protected function getHeaderActions(): array
+    {
+        if (! auth()->user()->hasAnyRole(['super_admin', 'admin'])) {
+            return [];
+        }
+
+        return [
+            \Filament\Actions\Action::make('export_management_report')
+                ->label('Export Management Report')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->url(route('exports.management-report'))
+                ->openUrlInNewTab(false),
+        ];
     }
 
     public function getViewData(): array
