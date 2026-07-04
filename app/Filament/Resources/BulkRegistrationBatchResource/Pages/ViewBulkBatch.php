@@ -51,7 +51,6 @@ class ViewBulkBatch extends ViewRecord
                             auth()->id()
                         );
                         Notification::make()->title('Payment confirmed. Codes issued.')->success()->send();
-                        // Redirect to refresh the page
                         redirect(BulkRegistrationBatchResource::getUrl('view', ['record' => $this->record]));
                     } catch (\Throwable $e) {
                         Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
@@ -86,7 +85,7 @@ class ViewBulkBatch extends ViewRecord
 
     public function infolist(Infolist $infolist): Infolist
     {
-        $batch = $this->record->load(['church.district', 'createdBy', 'entries.registrationCode']);
+        $this->record->load(['church.district', 'createdBy', 'entries.registrationCode']);
 
         return $infolist->schema([
 

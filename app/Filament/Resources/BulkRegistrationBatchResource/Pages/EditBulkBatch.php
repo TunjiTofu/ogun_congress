@@ -4,6 +4,7 @@ namespace App\Filament\Resources\BulkRegistrationBatchResource\Pages;
 
 use App\Filament\Resources\BulkRegistrationBatchResource;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditBulkBatch extends EditRecord
@@ -18,7 +19,6 @@ class EditBulkBatch extends EditRecord
         ];
     }
 
-    // Show a rejection notice at the top of the form
     protected function getHeaderWidgets(): array
     {
         return [];
@@ -55,9 +55,8 @@ class EditBulkBatch extends EditRecord
             $this->record->recalculateTotal();
         }
 
-        // If coordinator resubmitted, notify them
         if ($this->record->status === 'pending_payment' && request('was_rejected')) {
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title('Batch resubmitted for review.')
                 ->success()
                 ->send();
@@ -66,8 +65,6 @@ class EditBulkBatch extends EditRecord
 
     /**
      * Server-side duplicate check before Livewire persists entries.
-     * Stops the save and shows an error if the same name+phone+category
-     * appears more than once in a batch.
      */
     protected function beforeValidate(): void
     {
@@ -83,9 +80,9 @@ class EditBulkBatch extends EditRecord
 
             if (isset($seen[$key])) {
                 $this->halt();
-                \Filament\Notifications\Notification::make()
+                Notification::make()
                     ->title('Duplicate camper entry')
-                    ->body("\"" . trim($entry['full_name']) . "\" appears more than once with the same phone and category. Each camper must be a unique entry.")
+                    ->body('"' . trim($entry['full_name']) . '" appears more than once with the same phone and category. Each camper must be a unique entry.')
                     ->danger()
                     ->persistent()
                     ->send();
