@@ -13,14 +13,21 @@ class ListBulkBatches extends ListRecords
 
     protected function getHeaderActions(): array
     {
+        $isClosedForCoordinator = auth()->user()->hasRole('church_coordinator')
+            && (
+                setting('registration_open', '1') !== '1'
+                || (
+                    setting('registration_closes_at')
+                    && now()->gt(\Illuminate\Support\Carbon::parse(setting('registration_closes_at')))
+                )
+            );
+
         return [
             Actions\CreateAction::make()
                 ->label('New Bulk Registration')
-                ->disabled(fn () => setting('registration_open', '1') !== '1'
-                    || (setting('registration_closes_at') && now()->gt(\Illuminate\Support\Carbon::parse(setting('registration_closes_at')))))
-                ->tooltip(fn () => (setting('registration_open', '1') !== '1'
-                    || (setting('registration_closes_at') && now()->gt(\Illuminate\Support\Carbon::parse(setting('registration_closes_at')))))
-                    ? 'Registration is currently closed. Enable it under Settings → Registration Control.'
+                ->disabled($isClosedForCoordinator)
+                ->tooltip($isClosedForCoordinator
+                    ? 'Registration is currently closed. Contact the conference office for assistance.'
                     : null),
         ];
     }
