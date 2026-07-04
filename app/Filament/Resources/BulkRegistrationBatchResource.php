@@ -30,6 +30,35 @@ class BulkRegistrationBatchResource extends Resource
         return auth()->user()->hasAnyRole(['church_coordinator', 'accountant', 'super_admin', 'admin']);
     }
 
+    /**
+     * Filament evaluates canCreate() server-side before rendering the create page.
+     * Returning false issues a 403 even on direct URL access — unlike mount() redirects
+     * which are client-side and can be bypassed by navigating directly to the URL.
+     */
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
+        // Admins and super_admins can always create batches
+        if ($user->hasAnyRole(['super_admin', 'admin'])) {
+            return true;
+        }
+
+        // Coordinators: blocked when registration is closed
+        if ($user->hasRole('church_coordinator')) {
+            $registrationClosed = setting('registration_open', '1') !== '1'
+                || (
+                    setting('registration_closes_at')
+                    && now()->gt(\Illuminate\Support\Carbon::parse(setting('registration_closes_at')))
+                );
+
+            return ! $registrationClosed;
+        }
+
+        // Accountants cannot create batches (they only confirm/reject)
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

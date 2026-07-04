@@ -58,9 +58,9 @@ class RegistrationController extends Controller
         $allReady     = $idReady && $consentReady;
 
         return response()->json([
-            'status'       => $allReady ? 'ready' : 'pending',
-            'needs_consent'=> $needsConsent,
-            'urls'         => [
+            'status'        => $allReady ? 'ready' : 'pending',
+            'needs_consent' => $needsConsent,
+            'urls'          => [
                 'id_card'      => $camper->id_card_path
                     ? route('documents.download', ['path' => base64_encode($camper->id_card_path)])
                     : null,
@@ -73,13 +73,16 @@ class RegistrationController extends Controller
 
     // ── Web routes ────────────────────────────────────────────────────────────
 
+    /**
+     * Whether the overall registration programme is open.
+     * Controls coordinator batch creation and the welcome page banner.
+     * Does NOT gate the camper web form — use websiteFormLocked() for that.
+     */
     private function registrationIsOpen(): bool
     {
-        // Check toggle
         if (setting('registration_open', '1') !== '1') {
             return false;
         }
-        // Check closing date
         $closesAt = setting('registration_closes_at');
         if ($closesAt && now()->gt(\Illuminate\Support\Carbon::parse($closesAt))) {
             return false;
@@ -87,11 +90,33 @@ class RegistrationController extends Controller
         return true;
     }
 
+    /**
+     * Whether the public website registration form is explicitly locked.
+     *
+     * This is a SEPARATE toggle from registration_open. It specifically prevents
+     * campers from completing registration on the website — for example, after the
+     * congress has started and you want to stop walk-in online registrations without
+     * closing the admin panel for coordinators.
+     *
+     * Set camp_setting key "website_form_locked" to "1" to lock, "0" to unlock.
+     */
+    private function websiteFormLocked(): bool
+    {
+        return setting('website_form_locked', '0') === '1';
+    }
+
+    /**
+     * POST /registration/validate
+     * Validates the code and redirects to the form — or blocks if the website form is locked.
+     * Note: we do NOT block on registrationIsOpen() here. A camper who already has a code
+     * should be able to proceed even when registration is "closed" to new batches.
+     */
     public function validateCodeWeb(Request $request)
     {
-        if (! $this->registrationIsOpen()) {
-            return back()->with('error', 'Registration is currently closed. Please contact your church coordinator for more information.');
+        if ($this->websiteFormLocked()) {
+            return back()->with('error', 'Online registration is currently not available. Please contact your church coordinator for more information.');
         }
+
         $request->validate(['code' => ['required', 'string']]);
         try {
             $this->registrationService->validateCode($request->input('code'));
@@ -101,8 +126,19 @@ class RegistrationController extends Controller
         return redirect()->route('registration.form', ['code' => $request->input('code')]);
     }
 
+    /**
+     * GET /registration/form/{code}
+     * Shows the registration form — blocked only by websiteFormLocked(), not registrationIsOpen().
+     */
     public function form(string $code)
     {
+        // Block the form only if it is explicitly locked — not just because
+        // registration is "closed" (coordinators may still be processing batches).
+        if ($this->websiteFormLocked()) {
+            return redirect()->route('registration.index')
+                ->with('error', 'Online registration is currently not available. Please contact your church coordinator for more information.');
+        }
+
         try {
             $prefill = $this->registrationService->validateCode($code);
         } catch (\Throwable $e) {
@@ -133,6 +169,13 @@ class RegistrationController extends Controller
      */
     public function submitWeb(SubmitRegistrationRequest $request)
     {
+        // Double-check the lock at submission time (in case the form was already open
+        // in the browser when the setting was toggled).
+        if ($this->websiteFormLocked()) {
+            return redirect()->route('registration.index')
+                ->with('error', 'Online registration is currently not available. Please contact your church coordinator.');
+        }
+
         $data = $request->validated();
         unset($data['photo']);
 
@@ -142,7 +185,7 @@ class RegistrationController extends Controller
             $realPath = $file->getRealPath();
 
             if ($realPath && file_exists($realPath)) {
-                $rawBytes = file_get_contents($realPath);
+                $rawBytes  = file_get_contents($realPath);
                 $jpegBytes = $this->toJpeg($rawBytes);
 
                 $data['photo_contents']  = $jpegBytes;
