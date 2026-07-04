@@ -15,6 +15,7 @@ class StatsOverviewWidget extends BaseWidget
     protected static ?int $sort = 1;
     protected int|string|array $columnSpan = 'full';
 
+
     // Reduced from 30s — each poll runs 10+ DB queries.
     // Stats are cached for 90s so concurrent admin users share one DB hit.
     protected static ?string $pollingInterval = '120s';

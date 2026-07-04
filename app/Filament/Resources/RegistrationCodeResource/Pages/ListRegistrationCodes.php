@@ -51,10 +51,11 @@ class ListRegistrationCodes extends ListRecords
      * Scope the base query so church coordinators only see codes
      * belonging to their church members.
      * Accountants and super_admins see everything.
+     * Also eager-load church.district for the admin columns.
      */
     protected function getTableQuery(): Builder
     {
-        $query = parent::getTableQuery();
+        $query = parent::getTableQuery()->with(['church.district']);
         $user  = auth()->user();
 
         if ($user->hasRole('church_coordinator') && $user->church_id) {

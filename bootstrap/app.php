@@ -2,7 +2,6 @@
 
 use App\Http\Middleware\EnforceCampOver;
 use App\Http\Middleware\ExtractBearerToken;
-use App\Http\Middleware\GzipResponse;
 use App\Http\Middleware\SetAppTimezone;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -45,13 +44,24 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
 
-        // Gzip compress web responses — reduces bandwidth by 60-80%
-        $middleware->appendToGroup('web', GzipResponse::class);
+        // Gzip compression is handled by Apache mod_deflate in public/.htaccess.
+        // PHP-level GzipResponse middleware removed — it caused 405 errors on
+        // Livewire POST requests in some Apache/cPanel configurations.
 
         // Force-logout non-super_admin when camp is over
         $middleware->appendToGroup('web', EnforceCampOver::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+
+        // ── POST too large (photo upload exceeds server limits) ────────────────
+        $exceptions->render(function (\Illuminate\Http\Exceptions\PostTooLargeException $e, Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'The uploaded file is too large.'], 413);
+            }
+            return back()->withErrors([
+                'photo' => 'Your photo is too large. Please use a smaller image (under 5MB) or retake with the camera.',
+            ])->withInput();
+        });
 
         // ── Unauthenticated ───────────────────────────────────────────────────
         // API → 401 JSON. Web → /admin/login (never route('login')).
@@ -86,6 +96,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // ── All other exceptions ──────────────────────────────────────────────
         // Log silently; never show raw stack traces to the user.
         $exceptions->render(function (\Throwable $e, Request $request) {
+            // Skip intentional HTTP exceptions (403/404) — these are expected.
+            // Filament's canAccess() calls abort() for unauthorised users.
+            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException
+                && in_array($e->getStatusCode(), [403, 404])) {
+                if ($request->expectsJson() || $request->is('api/*')) {
+                    return response()->json(['message' => $e->getMessage() ?: 'Forbidden.'], $e->getStatusCode());
+                }
+                $view = view()->exists('errors.' . $e->getStatusCode()) ? 'errors.' . $e->getStatusCode() : 'errors.500';
+                return response()->view($view, [], $e->getStatusCode());
+            }
+
             // API / JSON clients always get a structured response
             if ($request->expectsJson() || $request->is('api/*')) {
                 Log::error('api.unhandled_exception', [
@@ -108,8 +129,6 @@ return Application::configure(basePath: dirname(__DIR__))
                     'user_id'   => auth()->id(),
                     'trace'     => $e->getTraceAsString(),
                 ]);
-                // Return null → Laravel falls through to its default handler
-                // (Filament has its own error page for admin routes)
                 return null;
             }
 
