@@ -154,8 +154,7 @@
     $campEnd      = setting('camp_end_date');
     $regCloses    = setting('registration_closes_at');
     $regOpen      = setting('registration_open','1') === '1'
-        && (! $regCloses || now()->lt(Carbon::parse($regCloses, 'Africa/Lagos')));
-
+        && (! $regCloses || now()->lt(Carbon::parse($regCloses)));
     $campActive   = $campStart && $campEnd
         && now()->between(Carbon::parse($campStart), Carbon::parse($campEnd));
     $mediaEnabled = setting('media_upload_enabled','0') === '1';
@@ -181,14 +180,14 @@
     }
 @endphp
 
-    <!-- ── TOPBAR ─────────────────────────────────────────────────────────────── -->
+<!-- ── TOPBAR ─────────────────────────────────────────────────────────────── -->
 <div class="topbar">
     <div class="topbar-inner">
         @if($regOpen)
             <span class="topbar-dot" style="background:#5ED48A;box-shadow:0 0 0 3px rgba(94,212,138,.18)"></span>
             {{ setting('camp_name','Ogun Conference Youth Congress 2026') }}
-            {{--            &mdash;--}}
-            {{--            {{ setting('camp_venue','Abeokuta') }} --}}
+{{--            &mdash;--}}
+{{--            {{ setting('camp_venue','Abeokuta') }} --}}
             &middot;
             {{ setting('camp_dates','Aug 16–22, 2026') }}
             @if($regCloses)
@@ -255,10 +254,10 @@
     </div>
     <div class="hero-container">
         <div class="hero-left">
-            {{--            <div class="hero-eyebrow">--}}
-            {{--                <span class="hero-eyebrow-dot"></span>--}}
-            {{--                {{ setting('camp_venue','Abeokuta') }} 2026 &nbsp;&bull;&nbsp; {{ setting('camp_dates','August 16–22') }}--}}
-            {{--            </div>--}}
+{{--            <div class="hero-eyebrow">--}}
+{{--                <span class="hero-eyebrow-dot"></span>--}}
+{{--                {{ setting('camp_venue','Abeokuta') }} 2026 &nbsp;&bull;&nbsp; {{ setting('camp_dates','August 16–22') }}--}}
+{{--            </div>--}}
 
             @if($regOpen && $regCloses)
                 <div class="hero-deadline">
@@ -282,41 +281,41 @@
                     </div>
                 </div>
 
-                {{--                <div class="hero-deadline">--}}
-                {{--                    <div class="hero-deadline-pulse"><span></span></div>--}}
-                {{--                    <div class="hero-deadline-lbl">--}}
-                {{--                        <span class="hero-deadline-eyebrow">Registration closes</span>--}}
-                {{--                        <span class="hero-deadline-sub">{{ Carbon::parse($regCloses)->format('d M Y · H:i') }} WAT</span>--}}
-                {{--                    </div>--}}
+{{--                <div class="hero-deadline">--}}
+{{--                    <div class="hero-deadline-pulse"><span></span></div>--}}
+{{--                    <div class="hero-deadline-lbl">--}}
+{{--                        <span class="hero-deadline-eyebrow">Registration closes</span>--}}
+{{--                        <span class="hero-deadline-sub">{{ Carbon::parse($regCloses)->format('d M Y · H:i') }} WAT</span>--}}
+{{--                    </div>--}}
 
-                {{--                    <div class="hero-deadline-cd">--}}
-                {{--                        <div class="hdcd-cell">--}}
-                {{--                            <span class="hdcd-num" id="rd-d" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
-                {{--                            <span class="hdcd-lbl">D</span>--}}
-                {{--                        </div>--}}
+{{--                    <div class="hero-deadline-cd">--}}
+{{--                        <div class="hdcd-cell">--}}
+{{--                            <span class="hdcd-num" id="rd-d" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
+{{--                            <span class="hdcd-lbl">D</span>--}}
+{{--                        </div>--}}
 
-                {{--                        <span class="hdcd-sep">:</span>--}}
+{{--                        <span class="hdcd-sep">:</span>--}}
 
-                {{--                        <div class="hdcd-cell">--}}
-                {{--                            <span class="hdcd-num" id="rd-h" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
-                {{--                            <span class="hdcd-lbl">H</span>--}}
-                {{--                        </div>--}}
+{{--                        <div class="hdcd-cell">--}}
+{{--                            <span class="hdcd-num" id="rd-h" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
+{{--                            <span class="hdcd-lbl">H</span>--}}
+{{--                        </div>--}}
 
-                {{--                        <span class="hdcd-sep">:</span>--}}
+{{--                        <span class="hdcd-sep">:</span>--}}
 
-                {{--                        <div class="hdcd-cell">--}}
-                {{--                            <span class="hdcd-num" id="rd-m" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
-                {{--                            <span class="hdcd-lbl">M</span>--}}
-                {{--                        </div>--}}
+{{--                        <div class="hdcd-cell">--}}
+{{--                            <span class="hdcd-num" id="rd-m" style="font-size: 2.75rem; font-weight: 800; line-height: 1;">--</span>--}}
+{{--                            <span class="hdcd-lbl">M</span>--}}
+{{--                        </div>--}}
 
-                {{--                        <span class="hdcd-sep">:</span>--}}
+{{--                        <span class="hdcd-sep">:</span>--}}
 
-                {{--                        <div class="hdcd-cell">--}}
-                {{--                            <span class="hdcd-num" id="rd-s">--</span>--}}
-                {{--                            <span class="hdcd-lbl">S</span>--}}
-                {{--                        </div>--}}
-                {{--                    </div>--}}
-                {{--                </div>--}}
+{{--                        <div class="hdcd-cell">--}}
+{{--                            <span class="hdcd-num" id="rd-s">--</span>--}}
+{{--                            <span class="hdcd-lbl">S</span>--}}
+{{--                        </div>--}}
+{{--                    </div>--}}
+{{--                </div>--}}
             @endif
 
             <h1 class="hero-title">From the Word<br/><em>to the World</em></h1>
@@ -805,17 +804,17 @@
                             <span style="font-size:16px;color:var(--muted)">&nearr;</span>
                         </a>
                     @endif
-                    {{--                    @if(setting('secretariat_phone'))--}}
-                    {{--                        <a href="tel:{{ setting('secretariat_phone') }}" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">--}}
-                    {{--                            <div style="width:44px;height:44px;border-radius:12px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#128222;</div>--}}
-                    {{--                            <div style="flex:1"><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Secretariat</div><div style="font-size:13px;color:var(--text-2)">{{ setting('secretariat_phone') }}</div></div>--}}
-                    {{--                            <span style="font-size:16px;color:var(--muted)">&nearr;</span>--}}
-                    {{--                        </a>--}}
-                    {{--                    @endif--}}
-                    {{--                    <div style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px">--}}
-                    {{--                        <div style="width:44px;height:44px;border-radius:12px;background:var(--gold-soft);color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#127776;</div>--}}
-                    {{--                        <div><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Seventh-day Adventist</div><div style="font-size:13px;color:var(--text-2)">Ogun Conference Youth Department</div></div>--}}
-                    {{--                    </div>--}}
+{{--                    @if(setting('secretariat_phone'))--}}
+{{--                        <a href="tel:{{ setting('secretariat_phone') }}" style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px;text-decoration:none;color:inherit;transition:transform .25s,border-color .25s,background .25s">--}}
+{{--                            <div style="width:44px;height:44px;border-radius:12px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#128222;</div>--}}
+{{--                            <div style="flex:1"><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Secretariat</div><div style="font-size:13px;color:var(--text-2)">{{ setting('secretariat_phone') }}</div></div>--}}
+{{--                            <span style="font-size:16px;color:var(--muted)">&nearr;</span>--}}
+{{--                        </a>--}}
+{{--                    @endif--}}
+{{--                    <div style="display:flex;align-items:center;gap:16px;background:var(--paper-2);border:1px solid var(--hairline);border-radius:var(--r);padding:18px 20px">--}}
+{{--                        <div style="width:44px;height:44px;border-radius:12px;background:var(--gold-soft);color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">&#127776;</div>--}}
+{{--                        <div><div style="font-family:var(--font-display);font-size:15px;font-weight:500;color:var(--ink);margin-bottom:2px">Seventh-day Adventist</div><div style="font-size:13px;color:var(--text-2)">Ogun Conference Youth Department</div></div>--}}
+{{--                    </div>--}}
                 </div>
             </div>
 

@@ -80,11 +80,14 @@ class RegistrationController extends Controller
      */
     private function registrationIsOpen(): bool
     {
+        // Delegates to the global helper which checks both the toggle and
+        // auto-close date with correct timezone handling.
+        // Inline check: toggle + auto-close date parsed in the app timezone (not UTC).
         if (setting('registration_open', '1') !== '1') {
             return false;
         }
         $closesAt = setting('registration_closes_at');
-        if ($closesAt && now()->gt(\Illuminate\Support\Carbon::parse($closesAt))) {
+        if ($closesAt && now()->gt(\Illuminate\Support\Carbon::parse($closesAt, 'Africa/Lagos'))) {
             return false;
         }
         return true;

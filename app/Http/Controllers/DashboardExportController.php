@@ -15,73 +15,121 @@ class DashboardExportController extends Controller
             abort(403);
         }
 
+        ini_set('memory_limit', '256M');
+
         try {
-            return $this->buildCsv();
+            return $this->generatePdf();
         } catch (\Throwable $e) {
             Log::error('management_report_export_failed', [
-                'message' => $e->getMessage(),
-                'trace'   => $e->getTraceAsString(),
+                'message'   => $e->getMessage(),
+                'exception' => get_class($e),
+                'file'      => $e->getFile(),
+                'line'      => $e->getLine(),
+                'trace'     => $e->getTraceAsString(),
             ]);
-            abort(500, 'Export failed. Please try again.');
+            throw $e;
         }
     }
 
-    private function buildCsv()
+    private function generatePdf()
     {
-        $filename = 'ogun-congress-2026-report-' . now()->format('Y-m-d-His') . '.csv';
-        $tmpPath  = tempnam(sys_get_temp_dir(), 'ogun_') . '.csv';
+        $stats           = $this->gatherStats();
+        $byChurch        = $this->gatherByChurch();
+        $tshirtSizes     = $this->gatherTshirtSizes();
+        $tshirtByDistrictChurch = $this->gatherTshirtByDistrictChurch();
+        $logoBase64      = $this->logoBase64();
+        $campVenue       = setting('camp_venue', 'Abeokuta');
+        $campDates       = setting('camp_dates', 'Aug 16–22, 2026');
 
-        $fh = fopen($tmpPath, 'w');
+        $html = view('pdf.management-report', compact(
+            'stats', 'byChurch', 'tshirtSizes', 'tshirtByDistrictChurch',
+            'logoBase64', 'campVenue', 'campDates'
+        ))->render();
 
-        // UTF-8 BOM — makes Excel open without encoding prompts
-        fwrite($fh, "\xEF\xBB\xBF");
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html)
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => false,
+                'isRemoteEnabled'      => false,
+                'defaultFont'          => 'DejaVu Sans',
+                'dpi'                  => 150,
+            ]);
 
-        // ── Summary ───────────────────────────────────────────────────────────
-        fputcsv($fh, ['OGUN CONFERENCE YOUTH CONGRESS 2026 — MANAGEMENT REPORT']);
-        fputcsv($fh, ['Generated', now()->format('d M Y H:i')]);
-        fputcsv($fh, []);
-        fputcsv($fh, ['REGISTRATION SUMMARY', '']);
-        fputcsv($fh, ['Metric', 'Count']);
-        fputcsv($fh, ['Total Registered Campers', Camper::count()]);
-        fputcsv($fh, ['Adventurers', Camper::where('category', 'adventurer')->count()]);
-        fputcsv($fh, ['Pathfinders', Camper::where('category', 'pathfinder')->count()]);
-        fputcsv($fh, ['Senior Youth', Camper::where('category', 'senior_youth')->count()]);
-        fputcsv($fh, ['Officials', Camper::where('is_official', true)->count()]);
-        fputcsv($fh, []);
-        fputcsv($fh, ['CODES', '']);
-        fputcsv($fh, ['Active (Unclaimed)', RegistrationCode::where('status', 'ACTIVE')->count()]);
-        fputcsv($fh, ['Claimed', RegistrationCode::where('status', 'CLAIMED')->count()]);
-        fputcsv($fh, ['Pending Payment', RegistrationCode::where('status', 'PENDING')->count()]);
-        fputcsv($fh, ['Void / Expired', RegistrationCode::whereIn('status', ['VOID', 'EXPIRED'])->count()]);
-        fputcsv($fh, []);
-        fputcsv($fh, ['PAYMENTS', '']);
-        fputcsv($fh, ['Pending Offline Payments', OfflinePayment::where('status', 'pending')->count()]);
-        fputcsv($fh, ['Confirmed Offline Payments', OfflinePayment::where('status', 'confirmed')->count()]);
-        fputcsv($fh, []);
-        fputcsv($fh, ['CAMP READINESS', '']);
-        fputcsv($fh, ['Consent Forms Outstanding', Camper::whereIn('category', ['adventurer', 'pathfinder'])->where('consent_collected', false)->count()]);
-        fputcsv($fh, ['Consent Forms Collected', Camper::whereIn('category', ['adventurer', 'pathfinder'])->where('consent_collected', true)->count()]);
-        fputcsv($fh, ['Photos Pending Approval', Camper::where('photo_status', 'pending')->count()]);
-        fputcsv($fh, ['Photos Approved', Camper::where('photo_status', 'approved')->count()]);
-        fputcsv($fh, []);
+        return $pdf->download(
+            'ogun-congress-2026-management-report-' . now()->format('Y-m-d') . '.pdf'
+        );
+    }
 
-        // ── T-shirt sizes ─────────────────────────────────────────────────────
-        fputcsv($fh, ['T-SHIRT SIZES', '']);
-        fputcsv($fh, ['Size', 'Count']);
-        $sizes = Camper::selectRaw('tshirt_size, COUNT(*) as cnt')
-            ->whereNotNull('tshirt_size')
-            ->groupBy('tshirt_size')
-            ->orderByRaw("FIELD(tshirt_size,'XS','S','M','L','XL','XXL','XXXL')")
-            ->get();
-        foreach ($sizes as $s) {
-            fputcsv($fh, [$s->tshirt_size, $s->cnt]);
-        }
-        fputcsv($fh, []);
+    // ── Data gathering ────────────────────────────────────────────────────────
 
-        // ── By district / church ──────────────────────────────────────────────
-        fputcsv($fh, ['BREAKDOWN BY DISTRICT & CHURCH', '', '', '', '', '']);
-        fputcsv($fh, ['District', 'Church', 'Adventurers', 'Pathfinders', 'Senior Youth', 'Total']);
+    private function gatherStats(): array
+    {
+        $totalCampers = Camper::count();
 
+        $adventurers = Camper::where('category', 'adventurer')->count();
+        $pathfinders = Camper::where('category', 'pathfinder')->count();
+        $seniorYouth = Camper::where('category', 'senior_youth')->count();
+        $officials   = Camper::where('is_official', true)->count();
+
+        $male   = Camper::where('gender', 'male')->count();
+        $female = Camper::where('gender', 'female')->count();
+
+        $codesPending     = RegistrationCode::where('status', 'PENDING')->count();
+        $codesActive      = RegistrationCode::where('status', 'ACTIVE')->count();
+        $codesClaimed     = RegistrationCode::where('status', 'CLAIMED')->count();
+        $codesVoidExpired = RegistrationCode::whereIn('status', ['VOID', 'EXPIRED'])->count();
+        $totalCodes       = $codesPending + $codesActive + $codesClaimed + $codesVoidExpired;
+
+        $onlinePayments            = RegistrationCode::where('payment_type', 'online')->where('status', 'CLAIMED')->count();
+        $offlinePaymentsConfirmed  = OfflinePayment::where('status', 'confirmed')->count();
+        $offlinePaymentsPending    = OfflinePayment::where('status', 'pending')->count();
+        $offlinePaymentsRejected   = OfflinePayment::where('status', 'rejected')->count();
+        $confirmedPayments         = $onlinePayments + $offlinePaymentsConfirmed;
+
+        // Revenue — confirmed: sum of amount_paid on CLAIMED codes
+        $totalRevenue = (int) RegistrationCode::where('status', 'CLAIMED')->sum('amount_paid');
+
+        // Prospective: active codes × their fee (approximated from amount_paid if set)
+        $prospectiveRevenue = (int) RegistrationCode::where('status', 'ACTIVE')->sum('amount_paid');
+
+        // Pending: offline payments awaiting confirmation
+        $pendingRevenue = (int) OfflinePayment::where('status', 'pending')->sum('amount');
+
+        $consentOutstanding = Camper::whereIn('category', ['adventurer', 'pathfinder'])->where('consent_collected', false)->count();
+        $consentCollected   = Camper::whereIn('category', ['adventurer', 'pathfinder'])->where('consent_collected', true)->count();
+        $photosPending      = Camper::where('photo_status', 'pending')->count();
+        $photosApproved     = Camper::where('photo_status', 'approved')->count();
+
+        return [
+            'total_campers'              => $totalCampers,
+            'adventurers'                => $adventurers,
+            'pathfinders'                => $pathfinders,
+            'senior_youth'               => $seniorYouth,
+            'officials'                  => $officials,
+            'male'                       => $male,
+            'female'                     => $female,
+            'active_codes'               => $codesActive,
+            'codes_pending'              => $codesPending,
+            'codes_claimed'              => $codesClaimed,
+            'codes_void_expired'         => $codesVoidExpired,
+            'total_codes'                => $totalCodes,
+            'confirmed_payments'         => $confirmedPayments,
+            'total_revenue'              => $totalRevenue,
+            'prospective_revenue'        => $prospectiveRevenue,
+            'pending_revenue'            => $pendingRevenue,
+            'online_payments'            => $onlinePayments,
+            'offline_payments_confirmed' => $offlinePaymentsConfirmed,
+            'offline_payments_pending'   => $offlinePaymentsPending,
+            'offline_payments_rejected'  => $offlinePaymentsRejected,
+            'consent_outstanding'        => $consentOutstanding,
+            'consent_collected'          => $consentCollected,
+            'photos_pending'             => $photosPending,
+            'photos_approved'            => $photosApproved,
+        ];
+    }
+
+    private function gatherByChurch(): array
+    {
         $rows = Camper::with('church.district')
             ->selectRaw('church_id, category, COUNT(*) as cnt')
             ->groupBy('church_id', 'category')
@@ -92,47 +140,66 @@ class DashboardExportController extends Controller
             $district = $r->church?->district?->name ?? 'Unknown';
             $church   = $r->church?->name ?? 'Unknown';
             $key      = $district . '||' . $church;
-            $byChurch[$key] ??= ['district' => $district, 'church' => $church, 'adventurer' => 0, 'pathfinder' => 0, 'senior_youth' => 0];
-            $byChurch[$key][$r->category] = $r->cnt;
+
+            $byChurch[$key] ??= ['district' => $district, 'church' => $church, 'adv' => 0, 'pf' => 0, 'syl' => 0, 'total' => 0];
+
+            $catKey = $r->category instanceof \App\Enums\CamperCategory ? $r->category->value : (string) $r->category;
+            $map    = ['adventurer' => 'adv', 'pathfinder' => 'pf', 'senior_youth' => 'syl'];
+
+            if ($field = ($map[$catKey] ?? null)) {
+                $byChurch[$key][$field] += $r->cnt;
+            }
+            $byChurch[$key]['total'] += $r->cnt;
         }
+
         ksort($byChurch);
+        return array_values($byChurch);
+    }
 
-        foreach ($byChurch as $data) {
-            $total = $data['adventurer'] + $data['pathfinder'] + $data['senior_youth'];
-            fputcsv($fh, [$data['district'], $data['church'], $data['adventurer'], $data['pathfinder'], $data['senior_youth'], $total]);
+    private function gatherTshirtSizes(): array
+    {
+        return Camper::selectRaw('tshirt_size, COUNT(*) as count')
+            ->whereNotNull('tshirt_size')
+            ->groupBy('tshirt_size')
+            ->orderByRaw("FIELD(tshirt_size,'XS','S','M','L','XL','XXL','XXXL')")
+            ->get()
+            ->map(fn ($r) => ['size' => $r->tshirt_size, 'count' => (int) $r->count])
+            ->toArray();
+    }
+
+    private function gatherTshirtByDistrictChurch(): array
+    {
+        $rows = Camper::with('church.district')
+            ->selectRaw('church_id, tshirt_size, COUNT(*) as cnt')
+            ->whereNotNull('tshirt_size')
+            ->groupBy('church_id', 'tshirt_size')
+            ->get();
+
+        // Structure: [ district => [ church => [ size => count ] ] ]
+        $result = [];
+        foreach ($rows as $r) {
+            $district = $r->church?->district?->name ?? 'Unknown';
+            $church   = $r->church?->name ?? 'Unknown';
+            $result[$district][$church][$r->tshirt_size] =
+                ($result[$district][$church][$r->tshirt_size] ?? 0) + $r->cnt;
         }
-        fputcsv($fh, []);
 
-        // ── Full camper list ──────────────────────────────────────────────────
-        fputcsv($fh, ['FULL CAMPER LIST', '', '', '', '', '', '', '', '', '', '']);
-        fputcsv($fh, ['#', 'Camper No.', 'Full Name', 'Category', 'Gender', 'T-Shirt', 'Church', 'District', 'Club Rank', 'Consent', 'Registered']);
+        ksort($result);
+        foreach ($result as &$churches) ksort($churches);
+        return $result;
+    }
 
-        // Chunk to avoid memory exhaustion on 1,000+ campers
-        $i = 1;
-        Camper::with('church.district')
-            ->orderBy('category')->orderBy('church_id')->orderBy('full_name')
-            ->chunk(200, function ($campers) use ($fh, &$i) {
-                foreach ($campers as $c) {
-                    fputcsv($fh, [
-                        $i++,
-                        $c->camper_number,
-                        $c->full_name,
-                        ucfirst(str_replace('_', ' ', $c->category?->value ?? '')),
-                        ucfirst($c->gender?->value ?? ''),
-                        $c->tshirt_size ?? '',
-                        $c->church?->name ?? '',
-                        $c->church?->district?->name ?? '',
-                        $c->club_rank ?? '',
-                        $c->consent_collected ? 'Yes' : 'No',
-                        $c->created_at?->format('d M Y'),
-                    ]);
-                }
-            });
-
-        fclose($fh);
-
-        return response()
-            ->download($tmpPath, $filename, ['Content-Type' => 'text/csv; charset=UTF-8'])
-            ->deleteFileAfterSend(true);
+    private function logoBase64(): ?string
+    {
+        foreach ([
+                     public_path('images/congress_logo.png'),
+                     public_path('images/congress_logo.jpg'),
+                     storage_path('app/public/images/congress_logo.png'),
+                 ] as $path) {
+            if (file_exists($path)) {
+                return base64_encode(file_get_contents($path));
+            }
+        }
+        return null;
     }
 }
