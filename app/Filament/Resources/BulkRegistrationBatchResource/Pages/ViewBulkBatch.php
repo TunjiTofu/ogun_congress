@@ -195,3 +195,4 @@ class ViewBulkBatch extends ViewRecord
         ]);
     }
 }
+

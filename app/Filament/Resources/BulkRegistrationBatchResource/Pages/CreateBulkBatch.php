@@ -14,24 +14,24 @@ class CreateBulkBatch extends CreateRecord
     {
         // Block coordinators from creating new batches when registration is closed.
         // Admins and super_admins can always create batches regardless of this setting.
-        if (auth()->user()->hasRole('church_coordinator')) {
-            $closed = setting('registration_open', '1') !== '1'
-                || (
-                    setting('registration_closes_at')
-                    && now()->gt(\Illuminate\Support\Carbon::parse(setting('registration_closes_at')))
-                );
+        // Checks both the toggle and the auto-close date with correct timezone handling.
+        $regClosed = setting('registration_open', '1') !== '1'
+            || (setting('registration_closes_at')
+                && now()->gt(\Illuminate\Support\Carbon::parse(
+                    setting('registration_closes_at'),
+                    'Africa/Lagos'
+                )));
 
-            if ($closed) {
-                Notification::make()
-                    ->title('Registration is currently closed.')
-                    ->body('New bulk registrations cannot be created at this time. Contact the conference office for assistance.')
-                    ->danger()
-                    ->persistent()
-                    ->send();
+        if (auth()->user()->hasRole('church_coordinator') && $regClosed) {
+            Notification::make()
+                ->title('Registration is currently closed.')
+                ->body('New bulk registrations cannot be created at this time. Contact the conference office for assistance.')
+                ->danger()
+                ->persistent()
+                ->send();
 
-                $this->redirect(static::getResource()::getUrl('index'));
-                return;
-            }
+            $this->redirect(static::getResource()::getUrl('index'));
+            return;
         }
 
         parent::mount();
