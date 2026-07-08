@@ -13,14 +13,14 @@ class ListBulkBatches extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        $isClosedForCoordinator = auth()->user()->hasRole('church_coordinator')
-            && (
-                setting('registration_open', '1') !== '1'
-                || (
-                    setting('registration_closes_at')
-                    && now()->gt(\Illuminate\Support\Carbon::parse(setting('registration_closes_at')))
-                )
-            );
+        // Check toggle + auto-close date, parsed in the app timezone (not UTC).
+        $regClosed = setting('registration_open', '1') !== '1'
+            || (setting('registration_closes_at')
+                && now()->gt(\Illuminate\Support\Carbon::parse(
+                    setting('registration_closes_at'),
+                    'Africa/Lagos'
+                )));
+        $isClosedForCoordinator = auth()->user()->hasRole('church_coordinator') && $regClosed;
 
         return [
             Actions\CreateAction::make()

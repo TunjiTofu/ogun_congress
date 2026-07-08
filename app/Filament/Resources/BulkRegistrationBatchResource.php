@@ -44,15 +44,16 @@ class BulkRegistrationBatchResource extends Resource
             return true;
         }
 
-        // Coordinators: blocked when registration is closed
+        // Coordinators: blocked when registration is closed.
+        // Inline check: toggle + auto-close date parsed in the app timezone (not UTC).
         if ($user->hasRole('church_coordinator')) {
-            $registrationClosed = setting('registration_open', '1') !== '1'
-                || (
-                    setting('registration_closes_at')
-                    && now()->gt(\Illuminate\Support\Carbon::parse(setting('registration_closes_at')))
-                );
-
-            return ! $registrationClosed;
+            $closed = setting('registration_open', '1') !== '1'
+                || (setting('registration_closes_at')
+                    && now()->gt(\Illuminate\Support\Carbon::parse(
+                        setting('registration_closes_at'),
+                        config('app.timezone')
+                    )));
+            return ! $closed;
         }
 
         // Accountants cannot create batches (they only confirm/reject)
