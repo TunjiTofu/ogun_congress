@@ -686,6 +686,60 @@
     @endforeach
 </table>
 
+{{-- T-shirt by department --}}
+<div class="ssub">By Department</div>
+@if(isset($tshirtByDept) && count($tshirtByDept) > 0)
+    @php
+        $deptSizeActive = [];
+        foreach($allSizes as $sz) {
+            foreach($tshirtByDept as $catSizes) {
+                if(($catSizes[$sz] ?? 0) > 0) { $deptSizeActive[] = $sz; break; }
+            }
+        }
+        $deptSizeActive = array_unique($deptSizeActive);
+        $deptOrder = ['adventurer' => 'Adventurers', 'pathfinder' => 'Pathfinders', 'senior_youth' => 'Senior Youth'];
+    @endphp
+    <div class="tbl-outer">
+        <table class="dt">
+            <thead>
+            <tr>
+                <th width="20%">Department</th>
+                @foreach($deptSizeActive as $sz)<th class="c" style="width:{{ floor(58/count($deptSizeActive)) }}%">{{ $sz }}</th>@endforeach
+                <th class="r" width="12%">Total</th>
+            </tr>
+            </thead>
+            <tbody>
+            @php $grandSzTotals = []; @endphp
+            @foreach($deptOrder as $catKey => $catLabel)
+                @if(!isset($tshirtByDept[$catKey])) @continue @endif
+                @php
+                    $csizes   = $tshirtByDept[$catKey];
+                    $catTotal = array_sum(array_intersect_key($csizes, array_flip($deptSizeActive)));
+                    $catColor = $catKey==='adventurer' ? '#1B3A8F' : ($catKey==='pathfinder' ? '#059669' : '#92650A');
+                @endphp
+                <tr>
+                    <td style="font-weight:bold;color:{{ $catColor }}">{{ $catLabel }}</td>
+                    @foreach($deptSizeActive as $sz)
+                        @php $cnt = $csizes[$sz] ?? 0; $grandSzTotals[$sz] = ($grandSzTotals[$sz] ?? 0) + $cnt; @endphp
+                        <td class="c" style="{{ $cnt>0?'font-weight:bold;color:#0F2255':'color:#D1D5DB' }}">{{ $cnt ?: '' }}</td>
+                    @endforeach
+                    <td class="n" style="color:{{ $catColor }}">{{ number_format($catTotal) }}</td>
+                </tr>
+            @endforeach
+            </tbody>
+            <tfoot>
+            <tr>
+                <td>Grand Total</td>
+                @foreach($deptSizeActive as $sz)
+                    <td class="c n">{{ $grandSzTotals[$sz] ?? 0 }}</td>
+                @endforeach
+                <td class="n">{{ number_format($totalShirts) }}</td>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+@endif
+
 {{-- T-shirt by district + church cross-tab --}}
 <div class="ssub">By District &amp; Church (All Departments Combined)</div>
 @if(count($tshirtByDistrictChurch) > 0)
