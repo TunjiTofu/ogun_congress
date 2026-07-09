@@ -33,16 +33,20 @@ class DashboardExportController extends Controller
 
     private function generatePdf()
     {
-        $stats           = $this->gatherStats();
-        $byChurch        = $this->gatherByChurch();
-        $tshirtSizes     = $this->gatherTshirtSizes();
-        $tshirtByDistrictChurch = $this->gatherTshirtByDistrictChurch();
-        $logoBase64      = $this->logoBase64();
-        $campVenue       = setting('camp_venue', 'Abeokuta');
-        $campDates       = setting('camp_dates', 'Aug 16–22, 2026');
+        $stats                   = $this->gatherStats();
+        $byChurch                = $this->gatherByChurch();
+        $tshirtSizes             = $this->gatherTshirtSizes();
+        $tshirtByDistrictChurch  = $this->gatherTshirtByDistrictChurch();
+        $tshirtByDeptDistrict    = $this->gatherTshirtByDeptDistrict();
+        $unclaimedByChurch       = $this->gatherUnclaimedByChurch();
+        $logoBase64              = $this->logoBase64();
+        $campVenue               = setting('camp_venue', 'Abeokuta');
+        $campDates               = setting('camp_dates', 'Aug 16–22, 2026');
 
         $html = view('pdf.management-report', compact(
-            'stats', 'byChurch', 'tshirtSizes', 'tshirtByDistrictChurch',
+            'stats', 'byChurch', 'tshirtSizes',
+            'tshirtByDistrictChurch', 'tshirtByDeptDistrict',
+            'unclaimedByChurch',
             'logoBase64', 'campVenue', 'campDates'
         ))->render();
 
@@ -60,7 +64,7 @@ class DashboardExportController extends Controller
         );
     }
 
-    // ── Data gathering ────────────────────────────────────────────────────────
+    // ── Stats ─────────────────────────────────────────────────────────────────
 
     private function gatherStats(): array
     {
@@ -80,19 +84,22 @@ class DashboardExportController extends Controller
         $codesVoidExpired = RegistrationCode::whereIn('status', ['VOID', 'EXPIRED'])->count();
         $totalCodes       = $codesPending + $codesActive + $codesClaimed + $codesVoidExpired;
 
-        $onlinePayments            = RegistrationCode::where('payment_type', 'online')->where('status', 'CLAIMED')->count();
-        $offlinePaymentsConfirmed  = OfflinePayment::where('status', 'confirmed')->count();
-        $offlinePaymentsPending    = OfflinePayment::where('status', 'pending')->count();
-        $offlinePaymentsRejected   = OfflinePayment::where('status', 'rejected')->count();
-        $confirmedPayments         = $onlinePayments + $offlinePaymentsConfirmed;
+        $onlinePayments           = RegistrationCode::where('payment_type', 'online')->where('status', 'CLAIMED')->count();
+        $offlinePaymentsConfirmed = OfflinePayment::where('status', 'confirmed')->count();
+        $offlinePaymentsPending   = OfflinePayment::where('status', 'pending')->count();
+        $offlinePaymentsRejected  = OfflinePayment::where('status', 'rejected')->count();
+        $confirmedPayments        = $onlinePayments + $offlinePaymentsConfirmed;
 
-        // Revenue — confirmed: sum of amount_paid on CLAIMED codes
-        $totalRevenue = (int) RegistrationCode::where('status', 'CLAIMED')->sum('amount_paid');
+        // Revenue from completed registrations (CLAIMED codes)
+        $claimedRevenue = (int) RegistrationCode::where('status', 'CLAIMED')->sum('amount_paid');
 
-        // Prospective: active codes × their fee (approximated from amount_paid if set)
-        $prospectiveRevenue = (int) RegistrationCode::where('status', 'ACTIVE')->sum('amount_paid');
+        // Revenue from confirmed payments where registration is not yet complete (ACTIVE codes)
+        $activeRevenue = (int) RegistrationCode::where('status', 'ACTIVE')->sum('amount_paid');
 
-        // Pending: offline payments awaiting confirmation
+        // Total confirmed revenue = claimed + active (both are paid and confirmed)
+        $totalRevenue = $claimedRevenue + $activeRevenue;
+
+        // Pending revenue: offline payments awaiting finance approval
         $pendingRevenue = (int) OfflinePayment::where('status', 'pending')->sum('amount');
 
         $consentOutstanding = Camper::whereIn('category', ['adventurer', 'pathfinder'])->where('consent_collected', false)->count();
@@ -114,8 +121,9 @@ class DashboardExportController extends Controller
             'codes_void_expired'         => $codesVoidExpired,
             'total_codes'                => $totalCodes,
             'confirmed_payments'         => $confirmedPayments,
+            'claimed_revenue'            => $claimedRevenue,
+            'active_revenue'             => $activeRevenue,
             'total_revenue'              => $totalRevenue,
-            'prospective_revenue'        => $prospectiveRevenue,
             'pending_revenue'            => $pendingRevenue,
             'online_payments'            => $onlinePayments,
             'offline_payments_confirmed' => $offlinePaymentsConfirmed,
@@ -127,6 +135,8 @@ class DashboardExportController extends Controller
             'photos_approved'            => $photosApproved,
         ];
     }
+
+    // ── By Church ─────────────────────────────────────────────────────────────
 
     private function gatherByChurch(): array
     {
@@ -156,6 +166,8 @@ class DashboardExportController extends Controller
         return array_values($byChurch);
     }
 
+    // ── T-Shirt overall ───────────────────────────────────────────────────────
+
     private function gatherTshirtSizes(): array
     {
         return Camper::selectRaw('tshirt_size, COUNT(*) as count')
@@ -167,6 +179,8 @@ class DashboardExportController extends Controller
             ->toArray();
     }
 
+    // ── T-Shirt by district + church (cross-tab) ──────────────────────────────
+
     private function gatherTshirtByDistrictChurch(): array
     {
         $rows = Camper::with('church.district')
@@ -175,7 +189,6 @@ class DashboardExportController extends Controller
             ->groupBy('church_id', 'tshirt_size')
             ->get();
 
-        // Structure: [ district => [ church => [ size => count ] ] ]
         $result = [];
         foreach ($rows as $r) {
             $district = $r->church?->district?->name ?? 'Unknown';
@@ -188,6 +201,63 @@ class DashboardExportController extends Controller
         foreach ($result as &$churches) ksort($churches);
         return $result;
     }
+
+    // ── T-Shirt by department, district, church ───────────────────────────────
+
+    private function gatherTshirtByDeptDistrict(): array
+    {
+        $rows = Camper::with('church.district')
+            ->selectRaw('church_id, category, tshirt_size, COUNT(*) as cnt')
+            ->whereNotNull('tshirt_size')
+            ->groupBy('church_id', 'category', 'tshirt_size')
+            ->get();
+
+        // Structure: [ district => [ church => [ category => [ size => count ] ] ] ]
+        $result = [];
+        foreach ($rows as $r) {
+            $district = $r->church?->district?->name ?? 'Unknown';
+            $church   = $r->church?->name ?? 'Unknown';
+            $catKey   = $r->category instanceof \App\Enums\CamperCategory
+                ? $r->category->value
+                : (string) $r->category;
+
+            $result[$district][$church][$catKey][$r->tshirt_size] =
+                ($result[$district][$church][$catKey][$r->tshirt_size] ?? 0) + $r->cnt;
+        }
+
+        ksort($result);
+        foreach ($result as &$churches) ksort($churches);
+        return $result;
+    }
+
+    // ── Unclaimed codes by district/church ───────────────────────────────────
+
+    private function gatherUnclaimedByChurch(): array
+    {
+        $rows = RegistrationCode::with('church.district')
+            ->where('status', 'ACTIVE')
+            ->selectRaw('prefill_church_id, COUNT(*) as cnt')
+            ->groupBy('prefill_church_id')
+            ->get();
+
+        $result = [];
+        foreach ($rows as $r) {
+            $district = $r->church?->district?->name ?? 'Unknown';
+            $church   = $r->church?->name ?? 'Unknown';
+            $key      = $district . '||' . $church;
+
+            $result[$key] = [
+                'district' => $district,
+                'church'   => $church,
+                'count'    => (int) $r->cnt,
+            ];
+        }
+
+        ksort($result);
+        return array_values($result);
+    }
+
+    // ── Logo ──────────────────────────────────────────────────────────────────
 
     private function logoBase64(): ?string
     {
