@@ -39,6 +39,7 @@ class DashboardExportController extends Controller
         $tshirtByDistrictChurch  = $this->gatherTshirtByDistrictChurch();
         $tshirtByDeptDistrict    = $this->gatherTshirtByDeptDistrict();
         $unclaimedByChurch       = $this->gatherUnclaimedByChurch();
+        $tshirtByDept            = $this->gatherTshirtByDept();
         $logoBase64              = $this->logoBase64();
         $campVenue               = setting('camp_venue', 'Abeokuta');
         $campDates               = setting('camp_dates', 'Aug 16–22, 2026');
@@ -46,7 +47,7 @@ class DashboardExportController extends Controller
         $html = view('pdf.management-report', compact(
             'stats', 'byChurch', 'tshirtSizes',
             'tshirtByDistrictChurch', 'tshirtByDeptDistrict',
-            'unclaimedByChurch',
+            'unclaimedByChurch', 'tshirtByDept',
             'logoBase64', 'campVenue', 'campDates'
         ))->render();
 
@@ -227,6 +228,27 @@ class DashboardExportController extends Controller
 
         ksort($result);
         foreach ($result as &$churches) ksort($churches);
+        return $result;
+    }
+
+    // ── T-Shirt by department ────────────────────────────────────────────────
+
+    private function gatherTshirtByDept(): array
+    {
+        $rows = Camper::selectRaw('category, tshirt_size, COUNT(*) as cnt')
+            ->whereNotNull('tshirt_size')
+            ->groupBy('category', 'tshirt_size')
+            ->get();
+
+        // Structure: [ category_value => [ size => count ] ]
+        $result = [];
+        foreach ($rows as $r) {
+            $catKey = $r->category instanceof \App\Enums\CamperCategory
+                ? $r->category->value
+                : (string) $r->category;
+            $result[$catKey][$r->tshirt_size] = ($result[$catKey][$r->tshirt_size] ?? 0) + $r->cnt;
+        }
+
         return $result;
     }
 
