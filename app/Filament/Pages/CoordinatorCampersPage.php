@@ -99,11 +99,23 @@ class CoordinatorCampersPage extends Page implements HasTable
             ->columns([
                 Tables\Columns\TextColumn::make('photo_thumb')
                     ->label('Photo')
-                    ->getStateUsing(fn ($record) => $record->getFirstMedia('photo')
-                        ? route('camper.photo', $record->id) : null)
+                    ->getStateUsing(function ($record) {
+                        $media = $record->getFirstMedia('photo');
+                        if (! $media) {
+                            return null;
+                        }
+                        // Append the media record's updated_at timestamp as a cache-buster.
+                        // When a photo is rejected the file is deleted (404). The browser
+                        // caches that 404 for the URL. After re-upload the URL path is
+                        // identical, so the browser serves the stale 404 instead of the new
+                        // file. The ?v= suffix changes each time the media record changes,
+                        // forcing the browser to fetch fresh.
+                        return route('camper.photo', $record->id)
+                            . '?v=' . $media->updated_at->timestamp;
+                    })
                     ->formatStateUsing(fn ($state): HtmlString => $state
                         ? new HtmlString('<img src="' . e($state) . '" style="width:44px;height:56px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #E2E8F0">')
-                        : new HtmlString('<div style="width:44px;height:56px;background:#F1F5F9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:1.3rem;border:1px solid #E2E8F0">👤</div>'))
+                        : new HtmlString('<div style="width:44px;height:56px;background:#F1F5F9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:1.3rem;border:1px solid #E2E8F0">&#128100;</div>'))
                     ->html(),
 
                 Tables\Columns\TextColumn::make('full_name')
@@ -152,7 +164,6 @@ class CoordinatorCampersPage extends Page implements HasTable
                     ->visible(fn () => $user->hasRole('district_coordinator')),
             ])
             ->actions([
-                // ── Full details view ──────────────────────────────────────
                 Tables\Actions\Action::make('view_details')
                     ->label('View')
                     ->icon('heroicon-o-eye')
@@ -163,7 +174,6 @@ class CoordinatorCampersPage extends Page implements HasTable
                     ->modalCancelActionLabel('Close')
                     ->modalWidth('2xl'),
 
-                // ── Upload photo — church_coordinator ONLY ─────────────────
                 Tables\Actions\Action::make('upload_photo')
                     ->label(fn ($record) => $record->photo_status === 'rejected' ? '📷 Replace Photo' : '📷 Upload Photo')
                     ->icon('heroicon-o-camera')
@@ -175,7 +185,6 @@ class CoordinatorCampersPage extends Page implements HasTable
                     ->form(fn (Camper $record) => $this->buildUploadForm($record))
                     ->action(fn (Camper $record, array $data) => $this->handlePhotoUpload($record, $data)),
 
-                // ── Download consent form ──────────────────────────────────
                 Tables\Actions\Action::make('download_consent')
                     ->label('Consent Form')
                     ->icon('heroicon-o-document-text')
@@ -186,8 +195,6 @@ class CoordinatorCampersPage extends Page implements HasTable
             ])
             ->paginated([25, 50, 100]);
     }
-
-    // ── Upload form ───────────────────────────────────────────────────────────
 
     private function buildUploadForm(Camper $record): array
     {
@@ -213,8 +220,6 @@ class CoordinatorCampersPage extends Page implements HasTable
         return $fields;
     }
 
-    // ── Upload handler ────────────────────────────────────────────────────────
-
     public function handlePhotoUpload(Camper $record, array $data): void
     {
         $uploaded = $data['photo'] ?? null;
@@ -239,13 +244,11 @@ class CoordinatorCampersPage extends Page implements HasTable
                 throw new \RuntimeException('File content is empty.');
             }
 
-            // Convert to JPEG
             $jpeg = $this->toJpeg($raw);
             if (! $jpeg || strlen($jpeg) === 0) {
                 $jpeg = $raw;
             }
 
-            // Clear old photo and save new one
             $record->clearMediaCollection('photo');
 
             $record->addMediaFromString($jpeg)
@@ -283,7 +286,6 @@ class CoordinatorCampersPage extends Page implements HasTable
 
     private function readUploadedBytes(mixed $uploaded): ?string
     {
-        // Case 1: Object (Livewire TemporaryUploadedFile)
         if (is_object($uploaded)) {
             if (method_exists($uploaded, 'get')) {
                 return $uploaded->get() ?: null;
@@ -299,14 +301,8 @@ class CoordinatorCampersPage extends Page implements HasTable
             }
         }
 
-        // Case 2: String path
-        // Filament FileUpload moves the file from Livewire temp storage to the
-        // configured disk BEFORE the action runs. The value is the filename on
-        // that disk. Default Filament disk is 'public'.
         if (is_string($uploaded)) {
             $filename = $uploaded;
-
-            // Try disks in order: public first (Filament default), then local (Livewire temp)
             $attempts = [
                 ['disk' => 'public', 'path' => $filename],
                 ['disk' => 'public', 'path' => 'livewire-tmp/' . $filename],
@@ -332,36 +328,31 @@ class CoordinatorCampersPage extends Page implements HasTable
         return null;
     }
 
-    // ── Detail modal HTML ─────────────────────────────────────────────────────
-
     private function buildDetailHtml(Camper $record): HtmlString
     {
         $record->loadMissing(['church.district', 'contacts', 'health', 'registrationCode', 'media']);
-        $photoUrl = $record->getFirstMedia('photo') ? route('camper.photo', $record->id) : null;
 
-        // CSS vars compatible with Filament dark/light mode
+        // Cache-busted URL — always shows the current photo, never a stale 404
+        $media    = $record->getFirstMedia('photo');
+        $photoUrl = $media
+            ? route('camper.photo', $record->id) . '?v=' . $media->updated_at->timestamp
+            : null;
+
         $html = '<style>
             .cd-wrap { font-family:inherit }
             .cd-label { font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.4rem;color:var(--fi-color-gray-500,#6b7280) }
             .cd-row { display:grid;grid-template-columns:130px 1fr;padding:0.35rem 0;border-bottom:1px solid var(--fi-color-gray-200,#e5e7eb);font-size:0.82rem }
             .cd-key { color:var(--fi-color-gray-400,#9ca3af) }
             .cd-val { font-weight:600;color:var(--fi-color-gray-900,#111827) }
-            .cd-contact { border:1px solid var(--fi-color-gray-200,#e5e7eb);border-radius:10px;padding:0.85rem 1rem;margin-bottom:0.5rem }
-            .cd-badge { font-size:0.65rem;font-weight:700;padding:0.15rem 0.6rem;border-radius:100px;display:inline-block;margin-bottom:0.4rem }
-            .cd-badge-p { background:rgba(99,102,241,0.12);color:#4f46e5 }
-            .cd-badge-e { background:rgba(239,68,68,0.12);color:#dc2626 }
-            html.dark .cd-badge-p { background:rgba(165,180,252,0.15);color:#a5b4fc }
-            html.dark .cd-badge-e { background:rgba(252,165,165,0.15);color:#fca5a5 }
             html.dark .cd-val { color:var(--fi-color-gray-100,#f3f4f6) }
             html.dark .cd-row { border-bottom-color:var(--fi-color-gray-700,#374151) }
         </style>';
         $html .= '<div class="cd-wrap">';
 
-        // Photo + identity header
         $html .= '<div style="display:flex;gap:1.25rem;align-items:flex-start;margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid #F1F5F9">';
         $html .= $photoUrl
             ? '<img src="' . e($photoUrl) . '" style="width:90px;height:112px;object-fit:cover;object-position:top center;border-radius:10px;border:2px solid #E2E8F0;flex-shrink:0">'
-            : '<div style="width:90px;height:112px;background:var(--fi-color-gray-100,#f1f5f9);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:var(--fi-color-gray-300,#cbd5e1);flex-shrink:0">👤</div>';
+            : '<div style="width:90px;height:112px;background:var(--fi-color-gray-100,#f1f5f9);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:var(--fi-color-gray-300,#cbd5e1);flex-shrink:0">&#128100;</div>';
         $html .= '<div style="flex:1">';
         $html .= '<h2 style="font-size:1.1rem;font-weight:800;color:var(--fi-color-primary-600,#0B2455);margin:0 0 0.25rem">' . e($record->full_name) . '</h2>';
         $html .= '<p style="font-family:monospace;font-size:0.78rem;color:var(--fi-color-gray-500,#64748b);margin:0 0 0.4rem">' . e($record->camper_number) . '</p>';
@@ -382,20 +373,17 @@ class CoordinatorCampersPage extends Page implements HasTable
             . '<span class="cd-key">' . $lbl . '</span>'
             . '<span class="cd-val">' . $val . '</span></div>';
 
-        // Personal
         $personal  = $row('Gender', ucfirst($record->gender?->value ?? '—'));
         $personal .= $row('Date of Birth', $record->date_of_birth ? $record->date_of_birth->format('d M Y') : '—');
         $personal .= $row('Phone', e($record->phone ?? '—'));
         $personal .= $row('Address', e($record->home_address ?? '—'));
         $html .= $section('Personal Details', $personal);
 
-        // Church
         $church  = $row('Church', e($record->church?->name ?? '—'));
         $church .= $row('District', e($record->church?->district?->name ?? '—'));
         $church .= $row('Ministry', e($record->ministry ?? '—'));
         $html .= $section('Church & Ministry', $church);
 
-        // Registration
         $reg  = $row('Code', '<span style="font-family:monospace">' . e($record->registrationCode?->code ?? '—') . '</span>');
         $reg .= $row('Payment', match($record->registrationCode?->payment_type?->value ?? '') {
             'online'  => 'Online (Paystack)',
@@ -406,7 +394,6 @@ class CoordinatorCampersPage extends Page implements HasTable
         $reg .= $row('Consent', $record->consent_collected ? '✅ Collected' : '⚠️ Not collected');
         $html .= $section('Registration', $reg);
 
-        // Contacts
         $contacts = $record->contacts;
         if ($contacts->isNotEmpty()) {
             $cHtml = '<div style="display:grid;gap:0.65rem">';
@@ -421,15 +408,14 @@ class CoordinatorCampersPage extends Page implements HasTable
                 $cHtml .= '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.3rem 1rem;font-size:0.78rem">';
                 $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Name</span><strong>' . e($c->full_name) . '</strong></div>';
                 if ($c->relationship) $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Relationship</span>' . e($c->relationship) . '</div>';
-                if ($c->phone) $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Phone</span>' . e($c->phone) . '</div>';
-                if ($c->email) $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Email</span>' . e($c->email) . '</div>';
+                if ($c->phone)        $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Phone</span>' . e($c->phone) . '</div>';
+                if ($c->email)        $cHtml .= '<div><span style="color:var(--fi-color-gray-400,#9ca3af);font-size:0.65rem;display:block">Email</span>' . e($c->email) . '</div>';
                 $cHtml .= '</div></div>';
             }
             $cHtml .= '</div>';
             $html .= $section('Parent / Guardian & Emergency Contacts', $cHtml);
         }
 
-        // Health
         $health = $record->health;
         if ($health) {
             $hHtml  = $row('Medical Conditions', e($health->medical_conditions ?? 'None'));
