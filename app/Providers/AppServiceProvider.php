@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Listeners\ResetPhotoStatusOnUpload;
 use App\Models\BulkRegistrationBatch;
 use App\Models\CampMedia;
 use App\Models\OfflinePayment;
@@ -11,10 +12,12 @@ use App\Observers\AdminActivityObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Opcodes\LogViewer\Facades\LogViewer;
+use Spatie\MediaLibrary\MediaCollections\Events\MediaHasBeenAddedEvent;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,6 +29,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $observer = new AdminActivityObserver();
+
+        Event::listen(MediaHasBeenAddedEvent::class, ResetPhotoStatusOnUpload::class);
 
         // Hook each model event to the observer manually
         // (avoids needing separate observer classes per model)
