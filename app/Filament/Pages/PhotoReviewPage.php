@@ -3,8 +3,6 @@
 namespace App\Filament\Pages;
 
 use App\Models\Camper;
-use App\Models\User;
-use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -36,26 +34,30 @@ class PhotoReviewPage extends Page implements HasTable
                 Camper::query()
                     ->whereHas('media', fn ($q) => $q->where('collection_name', 'photo'))
                     ->with(['media', 'church.district'])
+                    // Pending first (includes re-submitted), then rejected, then approved
                     ->orderByRaw("FIELD(photo_status, 'pending', 'rejected', 'approved')")
                     ->orderBy('full_name')
             )
             ->heading('Camper Photo Review')
-            ->defaultSort('full_name')
             ->columns([
                 Tables\Columns\TextColumn::make('photo_preview')
                     ->label('Photo')
                     ->getStateUsing(fn ($record) => $record->getFirstMedia('photo')
                         ? route('camper.photo', $record->id) : null)
                     ->formatStateUsing(fn ($state): HtmlString => $state
-                        ? new HtmlString('<img src="' . e($state) . '" style="width:56px;height:72px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #E2E8F0">')
+                        ? new HtmlString('<img src="' . e($state) . '?v=' . time() . '" style="width:56px;height:72px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #E2E8F0">')
                         : new HtmlString('<div style="width:56px;height:72px;background:#F1F5F9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:1.2rem">&#128100;</div>'))
                     ->html(),
 
                 Tables\Columns\TextColumn::make('full_name')
-                    ->searchable()->weight('bold')->sortable(),
+                    ->label('Name')
+                    ->searchable()
+                    ->weight('bold')
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('church.name')
-                    ->label('Church')->searchable(),
+                    ->label('Church')
+                    ->searchable(),
 
                 Tables\Columns\TextColumn::make('category')
                     ->badge()
@@ -68,24 +70,31 @@ class PhotoReviewPage extends Page implements HasTable
                         'success' => 'approved',
                         'danger'  => 'rejected',
                     ])
-                    ->formatStateUsing(fn ($state) => match($state) {
-                        'pending'  => 'Pending',
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'pending'  => 'Pending Review',
                         'approved' => 'Approved',
                         'rejected' => 'Rejected',
                         default    => $state,
                     }),
 
+                Tables\Columns\TextColumn::make('media_updated')
+                    ->label('Photo Uploaded')
+                    ->getStateUsing(fn ($record) => $record->getFirstMedia('photo')?->created_at)
+                    ->dateTime('d M Y, H:i')
+                    ->sortable(false)
+                    ->color('gray'),
+
                 Tables\Columns\TextColumn::make('photo_rejection_reason')
                     ->label('Rejection Reason')
                     ->placeholder('—')
                     ->wrap()
-                    ->visible(fn () => true)
                     ->toggleable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('photo_status')
+                    ->label('Status')
                     ->options([
-                        'pending'  => 'Pending',
+                        'pending'  => 'Pending Review',
                         'approved' => 'Approved',
                         'rejected' => 'Rejected',
                     ])
@@ -104,7 +113,10 @@ class PhotoReviewPage extends Page implements HasTable
                     ->visible(fn ($record) => $record->photo_status !== 'approved')
                     ->requiresConfirmation()
                     ->action(function ($record) {
-                        $record->update(['photo_status' => 'approved', 'photo_rejection_reason' => null]);
+                        $record->update([
+                            'photo_status'           => 'approved',
+                            'photo_rejection_reason' => null,
+                        ]);
                         \App\Jobs\GenerateCamperDocumentsJob::dispatch($record->id);
                         Notification::make()->title('Photo approved. ID card queued.')->success()->send();
                     }),
@@ -117,7 +129,8 @@ class PhotoReviewPage extends Page implements HasTable
                     ->form([
                         Textarea::make('reason')
                             ->label('Reason')
-                            ->required()->rows(2)
+                            ->required()
+                            ->rows(2)
                             ->placeholder('e.g. Not a clear passport photo, background not plain...'),
                     ])
                     ->action(function ($record, array $data) {
@@ -130,7 +143,8 @@ class PhotoReviewPage extends Page implements HasTable
                             'photo_rejection_reason' => $data['reason'],
                             'id_card_path'           => null,
                         ]);
-                        User::where('church_id', $record->church_id)
+                        // Notify the church coordinator
+                        \App\Models\User::where('church_id', $record->church_id)
                             ->whereHas('roles', fn ($q) => $q->where('name', 'church_coordinator'))
                             ->each(fn ($u) => Notification::make()
                                 ->title('Photo Rejected — ' . $record->full_name)
@@ -146,9 +160,13 @@ class PhotoReviewPage extends Page implements HasTable
                     ->color('success')
                     ->icon('heroicon-o-check-circle')
                     ->requiresConfirmation()
+                    ->deselectRecordsAfterCompletion()
                     ->action(function ($records) {
                         $records->each(function ($r) {
-                            $r->update(['photo_status' => 'approved', 'photo_rejection_reason' => null]);
+                            $r->update([
+                                'photo_status'           => 'approved',
+                                'photo_rejection_reason' => null,
+                            ]);
                             \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id);
                         });
                         Notification::make()->title('Photos approved. ID cards queued.')->success()->send();
@@ -169,20 +187,16 @@ class PhotoReviewPage extends Page implements HasTable
                     ])
                     ->action(function ($records, array $data) {
                         $records->each(function ($r) use ($data) {
-                            // Remove uploaded photo and any generated ID card
                             $r->clearMediaCollection('photo');
                             if ($r->id_card_path) {
                                 \Illuminate\Support\Facades\Storage::disk('private')->delete($r->id_card_path);
                             }
-
                             $r->update([
                                 'photo_status'           => 'rejected',
                                 'photo_rejection_reason' => $data['reason'],
                                 'id_card_path'           => null,
                             ]);
-
-                            // Notify the church coordinator for this camper\'s church
-                            User::where('church_id', $r->church_id)
+                            \App\Models\User::where('church_id', $r->church_id)
                                 ->whereHas('roles', fn ($q) => $q->where('name', 'church_coordinator'))
                                 ->each(fn ($u) => Notification::make()
                                     ->title('Photo Rejected — ' . $r->full_name)
@@ -190,13 +204,9 @@ class PhotoReviewPage extends Page implements HasTable
                                     ->danger()
                                     ->sendToDatabase($u));
                         });
-
-                        Notification::make()
-                            ->title('Photos rejected. Coordinators notified.')
-                            ->warning()
-                            ->send();
+                        Notification::make()->title('Photos rejected. Coordinators notified.')->warning()->send();
                     }),
             ])
-            ->poll('3600s');
+            ->poll('3660s');
     }
 }
