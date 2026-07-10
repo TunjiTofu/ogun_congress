@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Camper;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -47,7 +48,7 @@ class PhotoReviewPage extends Page implements HasTable
                         ? route('camper.photo', $record->id) : null)
                     ->formatStateUsing(fn ($state): HtmlString => $state
                         ? new HtmlString('<img src="' . e($state) . '" style="width:56px;height:72px;object-fit:cover;object-position:top center;border-radius:6px;border:1px solid #E2E8F0">')
-                        : new HtmlString('<div style="width:56px;height:72px;background:#F1F5F9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:1.2rem">👤</div>'))
+                        : new HtmlString('<div style="width:56px;height:72px;background:#F1F5F9;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:1.2rem">&#128100;</div>'))
                     ->html(),
 
                 Tables\Columns\TextColumn::make('full_name')
@@ -68,9 +69,9 @@ class PhotoReviewPage extends Page implements HasTable
                         'danger'  => 'rejected',
                     ])
                     ->formatStateUsing(fn ($state) => match($state) {
-                        'pending'  => '⏳ Pending',
-                        'approved' => '✅ Approved',
-                        'rejected' => '❌ Rejected',
+                        'pending'  => 'Pending',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
                         default    => $state,
                     }),
 
@@ -84,9 +85,9 @@ class PhotoReviewPage extends Page implements HasTable
             ->filters([
                 Tables\Filters\SelectFilter::make('photo_status')
                     ->options([
-                        'pending'  => '⏳ Pending',
-                        'approved' => '✅ Approved',
-                        'rejected' => '❌ Rejected',
+                        'pending'  => 'Pending',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
                     ])
                     ->default('pending'),
 
@@ -129,7 +130,7 @@ class PhotoReviewPage extends Page implements HasTable
                             'photo_rejection_reason' => $data['reason'],
                             'id_card_path'           => null,
                         ]);
-                        \App\Models\User::where('church_id', $record->church_id)
+                        User::where('church_id', $record->church_id)
                             ->whereHas('roles', fn ($q) => $q->where('name', 'church_coordinator'))
                             ->each(fn ($u) => Notification::make()
                                 ->title('Photo Rejected — ' . $record->full_name)
@@ -144,14 +145,58 @@ class PhotoReviewPage extends Page implements HasTable
                     ->label('Approve Selected')
                     ->color('success')
                     ->icon('heroicon-o-check-circle')
+                    ->requiresConfirmation()
                     ->action(function ($records) {
                         $records->each(function ($r) {
-                            $r->update(['photo_status' => 'approved']);
+                            $r->update(['photo_status' => 'approved', 'photo_rejection_reason' => null]);
                             \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id);
                         });
                         Notification::make()->title('Photos approved. ID cards queued.')->success()->send();
                     }),
+
+                Tables\Actions\BulkAction::make('bulk_reject')
+                    ->label('Reject Selected')
+                    ->color('danger')
+                    ->icon('heroicon-o-x-circle')
+                    ->deselectRecordsAfterCompletion()
+                    ->form([
+                        Textarea::make('reason')
+                            ->label('Rejection Reason')
+                            ->helperText('This reason will be applied to every selected photo and sent to each camper\'s church coordinator.')
+                            ->required()
+                            ->rows(3)
+                            ->placeholder('e.g. Not a clear passport photo, background not plain...'),
+                    ])
+                    ->action(function ($records, array $data) {
+                        $records->each(function ($r) use ($data) {
+                            // Remove uploaded photo and any generated ID card
+                            $r->clearMediaCollection('photo');
+                            if ($r->id_card_path) {
+                                \Illuminate\Support\Facades\Storage::disk('private')->delete($r->id_card_path);
+                            }
+
+                            $r->update([
+                                'photo_status'           => 'rejected',
+                                'photo_rejection_reason' => $data['reason'],
+                                'id_card_path'           => null,
+                            ]);
+
+                            // Notify the church coordinator for this camper\'s church
+                            User::where('church_id', $r->church_id)
+                                ->whereHas('roles', fn ($q) => $q->where('name', 'church_coordinator'))
+                                ->each(fn ($u) => Notification::make()
+                                    ->title('Photo Rejected — ' . $r->full_name)
+                                    ->body($data['reason'])
+                                    ->danger()
+                                    ->sendToDatabase($u));
+                        });
+
+                        Notification::make()
+                            ->title('Photos rejected. Coordinators notified.')
+                            ->warning()
+                            ->send();
+                    }),
             ])
-            ->poll('60s');
+            ->poll('3600s');
     }
 }
