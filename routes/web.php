@@ -4,6 +4,7 @@ use App\Http\Controllers\BulkIdCardController;
 use App\Http\Controllers\CamperExportController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\RegistrationController;
+use App\Http\Controllers\RejectedPhotosExportController;
 use App\Models\CampMedia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -190,6 +191,8 @@ Route::middleware(['auth'])->prefix('exports')->name('exports.')->group(function
     Route::get('campers', [CamperExportController::class, 'export'])->name('campers');
     Route::get('management-report', [App\Http\Controllers\DashboardExportController::class, 'export'])
         ->name('management-report');
+    Route::get('rejected-photos', [RejectedPhotosExportController::class, 'export'])  // ← fixed
+    ->name('rejected-photos');
 });
 
 // ── Registration downloads API (polled by success page) ──────────────────────
