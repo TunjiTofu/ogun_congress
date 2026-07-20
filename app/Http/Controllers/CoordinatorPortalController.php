@@ -78,7 +78,11 @@ class CoordinatorPortalController extends Controller
             ->latest()
             ->get();
 
-        return view('coordinator-portal.dashboard', compact('user', 'church', 'batches'));
+        // ── ADD THIS: count ACTIVE codes for this church ──────────────────────
+        $activeCodes = RegistrationCode::where('status', 'ACTIVE')
+            ->where('prefill_church_id', $church?->id)
+            ->count();
+        return view('coordinator.dashboard', compact('user', 'church', 'batches', 'activeCodes'));
     }
 
     /**
