@@ -33,19 +33,23 @@
         .header-church{font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700}
         .header-dist{font-size:0.8rem;color:rgba(255,255,255,0.65);margin-top:0.2rem}
 
-        .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
         .stat{background:#fff;border-radius:16px;padding:1.2rem 1.5rem;
             box-shadow:0 2px 12px rgba(6,78,59,0.08);border:1px solid rgba(16,185,129,0.1)}
+        .stat.amber{background:#FFFBEB;border-color:#FCD34D;border-top:3px solid #F59E0B}
         .stat-label{font-size:0.68rem;font-weight:700;color:#6B7280;text-transform:uppercase;
             letter-spacing:0.08em;margin-bottom:0.4rem}
+        .stat.amber .stat-label{color:#92400E}
         .stat-value{font-size:1.8rem;font-weight:900;color:var(--green)}
+        .stat.amber .stat-value{color:#D97706}
+        .stat-hint{font-size:0.65rem;color:#9CA3AF;margin-top:0.3rem;line-height:1.4}
+        .stat.amber .stat-hint{color:#B45309}
 
         .flash-success{background:#D1FAE5;border:1px solid #6EE7B7;border-radius:12px;
             padding:0.9rem 1.2rem;color:#065F46;font-size:0.85rem;margin-bottom:1.2rem}
         .flash-info{background:#DBEAFE;border:1px solid #93C5FD;border-radius:12px;
             padding:0.9rem 1.2rem;color:#1E40AF;font-size:0.85rem;margin-bottom:1.2rem}
 
-        /* Batch card */
         .batch-card{background:#fff;border-radius:20px;overflow:hidden;margin-bottom:1.5rem;
             box-shadow:0 2px 16px rgba(6,78,59,0.08);border:1px solid rgba(16,185,129,0.1)}
         .batch-header{padding:1rem 1.5rem;border-bottom:1px solid #F0FDF4;display:flex;
@@ -57,7 +61,6 @@
         .badge-confirmed{background:#D1FAE5;border-color:#6EE7B7;color:#065F46}
         .badge-pending{background:#FEF3C7;border-color:#FCD34D;color:#92400E}
 
-        /* Camper rows */
         .camper-row{padding:1rem 1.5rem;border-bottom:1px solid #F9FAFB;display:flex;
             align-items:center;justify-content:space-between;gap:1rem}
         .camper-row:last-child{border:none}
@@ -81,7 +84,8 @@
 
         .empty{padding:3rem;text-align:center;color:#9CA3AF;font-style:italic;font-size:0.85rem}
 
-        @media(max-width:600px){.stats{grid-template-columns:1fr 1fr}.stat-value{font-size:1.4rem}}
+        @media(max-width:700px){.stats{grid-template-columns:1fr 1fr}.stat-value{font-size:1.4rem}}
+        @media(max-width:420px){.stats{grid-template-columns:1fr}}
     </style>
 </head>
 <body>
@@ -110,7 +114,6 @@
         <div class="flash-info">&#x2139; {{ session('info') }}</div>
     @endif
 
-    {{-- Church header --}}
     <div class="header-card">
         <div class="header-label">Youth Leader Dashboard</div>
         <div class="header-church">{{ $church?->name ?? 'No Church Assigned' }}</div>
@@ -124,12 +127,13 @@
         </div>
     @else
 
-        {{-- Stats --}}
         @php
-            $totalCampers = $batches->sum(fn($b) => $b->entries->count());
-            $totalForms   = $batches->sum(fn($b) => $b->entries->where('status','registered')->count());
-            $totalPaid    = $batches->sum('amount_paid');
+            $totalCampers  = $batches->sum(fn($b) => $b->entries->count());
+            $totalForms    = $batches->sum(fn($b) => $b->entries->where('status','registered')->count());
+            $totalPaid     = $batches->sum('amount_paid');
+            $awaitingReg   = $activeCodes ?? 0;
         @endphp
+
         <div class="stats">
             <div class="stat">
                 <div class="stat-label">Total Campers</div>
@@ -139,11 +143,26 @@
                 <div class="stat-label">Forms Completed</div>
                 <div class="stat-value">{{ $totalForms }}</div>
             </div>
+            <div class="stat amber">
+                <div class="stat-label">&#9203; Paid, Not Registered</div>
+                <div class="stat-value">{{ $awaitingReg }}</div>
+                <div class="stat-hint">Code issued, registration form not yet submitted</div>
+            </div>
             <div class="stat">
                 <div class="stat-label">Total Paid</div>
                 <div class="stat-value" style="font-size:1.3rem">&#8358;{{ number_format($totalPaid) }}</div>
             </div>
         </div>
+
+        @if($awaitingReg > 0)
+            <div style="background:#FFFBEB;border:1px solid #FDE68A;border-left:4px solid #F59E0B;
+                border-radius:12px;padding:0.85rem 1.1rem;margin-bottom:1.2rem;
+                font-size:0.82rem;color:#78350F;line-height:1.5">
+                <strong>&#9888; {{ $awaitingReg }} camper{{ $awaitingReg === 1 ? '' : 's' }} still need to complete registration.</strong>
+                Please share their access codes with them and ask them to visit
+                <strong>{{ url('/') }}</strong> to fill in their details before camp begins.
+            </div>
+        @endif
 
         @forelse($batches as $batch)
             <div class="batch-card">
@@ -158,7 +177,7 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:0.5rem">
                         @php
-                            $done = $batch->entries->where('status','registered')->count();
+                            $done  = $batch->entries->where('status','registered')->count();
                             $total = $batch->entries->count();
                         @endphp
                         <span style="font-size:0.75rem;color:#6B7280;">{{ $done }}/{{ $total }} forms done</span>
@@ -183,6 +202,11 @@
                                     {{ $entry->category->label() }} &bull;
                                     @if($entry->registrationCode)
                                         <span class="camper-code">{{ $entry->registrationCode->code }}</span>
+                                        @if($entry->registrationCode->status === 'ACTIVE')
+                                            <span style="font-size:0.65rem;background:#FEF3C7;color:#92400E;
+                                                font-weight:700;padding:0.1rem 0.4rem;border-radius:100px;
+                                                margin-left:4px">Awaiting Registration</span>
+                                        @endif
                                     @else
                                         <span style="color:#EF4444;">No code yet</span>
                                     @endif

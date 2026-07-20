@@ -22,6 +22,11 @@
             ->where('event_type','check_in')->pluck('camper_id');
         $batches = \App\Models\BulkRegistrationBatch::where('created_by', $user->id)
             ->with('entries')->latest()->get();
+
+        // Codes that are ACTIVE for this church: payment confirmed, registration not yet done
+        $activeCodes = \App\Models\RegistrationCode::where('status', 'ACTIVE')
+            ->where('prefill_church_id', $user->church_id)
+            ->count();
     @endphp
 
     {{-- Church header --}}
@@ -53,6 +58,30 @@
             <p style="font-size:2rem;font-weight:900;color:var(--d-stat-4-vc);line-height:1">{{ $campers->where('photo_status','rejected')->count() }}</p>
             @if($campers->where('photo_status','rejected')->count() > 0)
                 <a href="{{ route('filament.admin.pages.coordinator-campers-page') }}" style="font-size:0.65rem;color:var(--d-stat-4-tc);text-decoration:underline;display:inline-block;margin-top:0.35rem">Upload replacements →</a>
+            @endif
+        </div>
+
+        {{-- Paid but not yet registered — spans full width to stand out as an action item --}}
+        <div style="grid-column:span 2;background:#422006;border:1px solid #92400E;border-left:4px solid #F59E0B;border-radius:14px;padding:1rem 1.1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem">
+            <div>
+                <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#FDE68A;margin-bottom:0.35rem">⏳ Paid · Awaiting Registration</p>
+                <a href="{{ route('filament.admin.resources.registration-codes.index', ['activeTab' => 'active']) }}"
+                   style="font-size:2rem;font-weight:900;color:#FCD34D;line-height:1;text-decoration:none;display:inline-block">{{ $activeCodes }}</a>
+                <a href="{{ route('filament.admin.resources.registration-codes.index', ['activeTab' => 'active']) }}"
+                   style="font-size:0.65rem;color:#FCD34D;text-decoration:underline;display:inline-block;margin-top:0.3rem;opacity:0.85">View list →</a>
+                <p style="font-size:0.65rem;color:#FDE68A;margin-top:0.3rem;opacity:0.8">
+                    Code issued, camper has not yet filled the registration form
+                </p>
+            </div>
+            @if($activeCodes > 0)
+                <div style="text-align:right;flex-shrink:0">
+                    <p style="font-size:0.68rem;color:#FDE68A;font-weight:600;margin-bottom:0.4rem">Action required</p>
+                    <p style="font-size:0.63rem;color:rgba(253,230,138,0.7);line-height:1.45;max-width:160px">
+                        Share codes with campers and ask them to visit the registration page.
+                    </p>
+                </div>
+            @else
+                <p style="font-size:0.72rem;color:#86EFAC;font-weight:700">✓ All caught up</p>
             @endif
         </div>
     </div>
