@@ -5,13 +5,13 @@ namespace App\Filament\Resources;
 use App\Enums\CodeStatus;
 use App\Enums\PaymentType;
 use App\Filament\Resources\RegistrationCodeResource\Pages;
-use App\Jobs\SendRegistrationCodeSmsJob;
 use App\Models\RegistrationCode;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class RegistrationCodeResource extends Resource
 {
@@ -28,12 +28,45 @@ class RegistrationCodeResource extends Resource
 
     public static function canCreate(): bool
     {
-        return false; // Codes are created via payment flows only
+        return false;
     }
 
     public static function form(Form $form): Form
     {
-        return $form->schema([]); // Read-only resource — no create/edit form
+        return $form->schema([]);
+    }
+
+    // ── Eagerly load relationships once per page, not per row ─────────────────
+    // Without this, Filament triggers N+1 queries for church/district on every
+    // rendered row, each creating new Eloquent model instances in memory.
+    // A single eager-loaded JOIN is far cheaper than 25–100 separate queries.
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery()
+            ->with(['church', 'church.district'])
+            ->select([
+                'registration_codes.id',
+                'registration_codes.code',
+                'registration_codes.status',
+                'registration_codes.payment_type',
+                'registration_codes.prefill_name',
+                'registration_codes.prefill_phone',
+                'registration_codes.prefill_category',
+                'registration_codes.prefill_church_id',
+                'registration_codes.amount_paid',
+                'registration_codes.activated_at',
+                'registration_codes.claimed_at',
+                'registration_codes.expires_at',
+                'registration_codes.created_at',
+                'registration_codes.updated_at',
+            ]);
+
+        // Coordinators only see their own church's codes
+        if (auth()->user()?->hasRole('church_coordinator')) {
+            $query->where('prefill_church_id', auth()->user()->church_id);
+        }
+
+        return $query;
     }
 
     public static function table(Table $table): Table
@@ -127,6 +160,9 @@ class RegistrationCodeResource extends Resource
                     ->toggleable(),
             ])
             ->defaultSort('created_at', 'desc')
+            // Smaller default page size reduces peak memory per request
+            ->defaultPaginationPageOption(25)
+            ->paginationPageOptions([10, 25, 50, 100])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options(collect(CodeStatus::cases())
@@ -140,34 +176,11 @@ class RegistrationCodeResource extends Resource
                         ->toArray()),
             ])
             ->actions([
-//                Tables\Actions\Action::make('resend_sms')
-//                    ->label('Resend Code SMS')
-//                    ->icon('heroicon-o-device-phone-mobile')
-//                    ->color('info')
-//                    ->requiresConfirmation()
-//                    ->modalDescription(fn (RegistrationCode $r) =>
-//                        "Resend the registration code to {$r->prefill_phone}?"
-//                    )
-//                    ->visible(fn (RegistrationCode $r) => $r->status === CodeStatus::ACTIVE)
-//                    ->action(function (RegistrationCode $record) {
-//                        SendRegistrationCodeSmsJob::dispatch(
-//                            phone: $record->prefill_phone,
-//                            code:  $record->code,
-//                            name:  $record->prefill_name,
-//                        );
-//
-//                        Notification::make()
-//                            ->title('SMS queued successfully.')
-//                            ->success()
-//                            ->send();
-//                    }),
-
                 Tables\Actions\Action::make('void')
                     ->label('Void Code')
                     ->icon('heroicon-o-no-symbol')
                     ->color('danger')
                     ->requiresConfirmation()
-                    // Church coordinators can view codes but cannot void them
                     ->visible(fn (RegistrationCode $r) =>
                         $r->status === CodeStatus::ACTIVE
                         && ! auth()->user()->hasRole('church_coordinator')
