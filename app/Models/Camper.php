@@ -100,6 +100,11 @@ class Camper extends Model implements HasMedia
         return $this->belongsTo(CampRole::class);
     }
 
+    public function skillRegistration(): HasOne
+    {
+        return $this->hasOne(CamperSkillRegistration::class);
+    }
+
     // ── Scopes ────────────────────────────────────────────────────────────────
 
     public function scopeAdventurers($query)
