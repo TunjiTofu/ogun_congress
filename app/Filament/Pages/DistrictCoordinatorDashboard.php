@@ -2,11 +2,11 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\BulkRegistrationBatch;
 use App\Models\Camper;
 use App\Models\CheckinEvent;
 use App\Models\Church;
 use App\Models\District;
+use App\Models\RegistrationCode;
 use Filament\Pages\Page;
 
 class DistrictCoordinatorDashboard extends Page
@@ -16,7 +16,6 @@ class DistrictCoordinatorDashboard extends Page
     protected static ?int    $navigationSort  = -10;
     protected static string  $view            = 'filament.pages.district-coordinator-dashboard';
     protected static ?string $title           = 'District Youth Leader Dashboard';
-
 
     public static function canAccess(): bool
     {
@@ -30,13 +29,15 @@ class DistrictCoordinatorDashboard extends Page
 
         if (! $district) {
             return [
-                'district'        => null,
-                'churches'        => collect(),
-                'churchStats'     => collect(),
-                'totalRegistered' => 0,
-                'totalCheckedIn'  => 0,
-                'consentPending'  => 0,
-                'categoryBreakdown' => [],
+                'district'           => null,
+                'churches'           => collect(),
+                'churchStats'        => collect(),
+                'totalRegistered'    => 0,
+                'totalCheckedIn'     => 0,
+                'consentPending'     => 0,
+                'categoryBreakdown'  => [],
+                'activeCodesCount'   => 0,
+                'activeCodesByChurch'=> collect(),
             ];
         }
 
@@ -60,9 +61,9 @@ class DistrictCoordinatorDashboard extends Page
 
         // Per-church breakdown
         $churchStats = $district->churches->map(function (Church $church) use ($campers, $checkedInIds) {
-            $churchCampers   = $campers->where('church_id', $church->id);
-            $checkedIn       = $churchCampers->whereIn('id', $checkedInIds->toArray())->count();
-            $consentPending  = $churchCampers->filter(fn ($c) => $c->requiresConsentForm() && ! $c->consent_collected)->count();
+            $churchCampers  = $campers->where('church_id', $church->id);
+            $checkedIn      = $churchCampers->whereIn('id', $checkedInIds->toArray())->count();
+            $consentPending = $churchCampers->filter(fn ($c) => $c->requiresConsentForm() && ! $c->consent_collected)->count();
 
             return [
                 'church'          => $church,
@@ -82,14 +83,31 @@ class DistrictCoordinatorDashboard extends Page
             'senior_youth' => $campers->filter(fn ($c) => ($c->category?->value ?? $c->category) === 'senior_youth')->count(),
         ];
 
+        // Active codes (paid but registration form not yet completed)
+        // grouped by church so the district leader can see exactly where the gaps are
+        $activeCodesByChurch = RegistrationCode::where('status', 'ACTIVE')
+            ->whereIn('prefill_church_id', $churchIds)
+            ->with('church')
+            ->get()
+            ->groupBy('prefill_church_id')
+            ->map(fn ($codes) => [
+                'church' => $codes->first()->church,
+                'count'  => $codes->count(),
+                'codes'  => $codes,
+            ])
+            ->sortByDesc('count')
+            ->values();
+
         return [
-            'district'          => $district,
-            'churches'          => $district->churches,
-            'churchStats'       => $churchStats,
-            'totalRegistered'   => $campers->count(),
-            'totalCheckedIn'    => $checkedInIds->count(),
-            'consentPending'    => $campers->filter(fn ($c) => $c->requiresConsentForm() && ! $c->consent_collected)->count(),
-            'categoryBreakdown' => $categoryBreakdown,
+            'district'            => $district,
+            'churches'            => $district->churches,
+            'churchStats'         => $churchStats,
+            'totalRegistered'     => $campers->count(),
+            'totalCheckedIn'      => $checkedInIds->count(),
+            'consentPending'      => $campers->filter(fn ($c) => $c->requiresConsentForm() && ! $c->consent_collected)->count(),
+            'categoryBreakdown'   => $categoryBreakdown,
+            'activeCodesCount'    => $activeCodesByChurch->sum('count'),
+            'activeCodesByChurch' => $activeCodesByChurch,
         ];
     }
 }

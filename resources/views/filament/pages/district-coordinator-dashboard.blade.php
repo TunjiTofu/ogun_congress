@@ -26,8 +26,8 @@
             <p style="font-size:0.75rem;color:rgba(255,255,255,0.55);margin-top:0.2rem">{{ $churches->count() }} {{ Str::plural('church', $churches->count()) }} · Ogun Conference Youth Congress 2026</p>
         </div>
 
-        {{-- Stats --}}
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.85rem;margin-bottom:1.25rem">
+        {{-- Stats row --}}
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.85rem;margin-bottom:0.85rem">
             <div style="background:var(--d-stat-1-bg);border:1px solid var(--d-stat-1-bc);border-radius:14px;padding:1rem 1.1rem">
                 <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--d-stat-1-tc);margin-bottom:0.35rem">👥 Total Registered</p>
                 <p style="font-size:2rem;font-weight:900;color:var(--d-stat-1-vc);line-height:1">{{ $totalRegistered }}</p>
@@ -45,6 +45,77 @@
                 <p style="font-size:2rem;font-weight:900;color:var(--d-text);line-height:1">{{ $churches->count() }}</p>
             </div>
         </div>
+
+        {{-- ── PAID · AWAITING REGISTRATION ────────────────────────────────── --}}
+        <div style="background:#422006;border:1px solid #92400E;border-left:4px solid #F59E0B;border-radius:14px;padding:1rem 1.25rem;margin-bottom:1.25rem">
+
+            {{-- Header row --}}
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:{{ $activeCodesCount > 0 ? '0.85rem' : '0' }}">
+                <div>
+                    <p style="font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#FDE68A;margin-bottom:0.35rem">⏳ Paid · Awaiting Registration</p>
+                    <a href="{{ route('filament.admin.resources.registration-codes.index', ['activeTab' => 'active']) }}"
+                       style="font-size:2rem;font-weight:900;color:#FCD34D;line-height:1;text-decoration:none;display:inline-block">{{ $activeCodesCount }}</a>
+                    <p style="font-size:0.65rem;color:rgba(253,230,138,0.75);margin-top:0.3rem">
+                        Payment confirmed — registration form not yet submitted
+                    </p>
+{{--                    @if($activeCodesCount > 0)--}}
+{{--                        <a href="{{ route('filament.admin.resources.registration-codes.index', ['activeTab' => 'active']) }}"--}}
+{{--                           style="font-size:0.65rem;color:#FCD34D;text-decoration:underline;display:inline-block;margin-top:0.4rem">View full list →</a>--}}
+{{--                    @endif--}}
+                </div>
+                @if($activeCodesCount === 0)
+                    <p style="font-size:0.78rem;color:#86EFAC;font-weight:700;flex-shrink:0">✓ All caught up</p>
+                @endif
+            </div>
+
+            @if($activeCodesCount > 0 && $activeCodesByChurch->isNotEmpty())
+
+                {{-- Bar chart by church --}}
+                <div style="border-top:1px solid rgba(253,230,138,0.2);padding-top:0.85rem;margin-bottom:0.85rem">
+                    <p style="font-size:0.6rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:rgba(253,230,138,0.55);margin-bottom:0.6rem">Breakdown by Church</p>
+                    @php $maxCount = $activeCodesByChurch->max('count'); @endphp
+                    <div style="display:grid;gap:0.45rem">
+                        @foreach($activeCodesByChurch as $group)
+                            <div style="display:flex;align-items:center;gap:0.75rem">
+                                <span style="font-size:0.75rem;font-weight:600;color:#FDE68A;width:180px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                    {{ $group['church']?->name ?? 'Unknown Church' }}
+                                </span>
+                                <div style="flex:1;background:rgba(253,230,138,0.12);border-radius:4px;height:7px;overflow:hidden">
+                                    <div style="width:{{ $maxCount > 0 ? round($group['count'] / $maxCount * 100) : 0 }}%;background:#F59E0B;height:100%;border-radius:4px"></div>
+                                </div>
+                                <span style="font-size:0.85rem;font-weight:900;color:#FCD34D;min-width:28px;text-align:right;flex-shrink:0">{{ $group['count'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Detailed camper list per church --}}
+                <div style="border-top:1px solid rgba(253,230,138,0.2);padding-top:0.85rem">
+                    <p style="font-size:0.6rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:rgba(253,230,138,0.55);margin-bottom:0.7rem">Campers Awaiting Registration</p>
+                    <div style="display:grid;gap:0.85rem">
+                        @foreach($activeCodesByChurch as $group)
+                            <div>
+                                {{-- Church name + count badge --}}
+                                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">
+                                    <span style="font-size:0.75rem;font-weight:700;color:#FDE68A">{{ $group['church']?->name ?? 'Unknown Church' }}</span>
+                                    <span style="font-size:0.6rem;font-weight:700;background:rgba(245,158,11,0.25);color:#FCD34D;padding:0.1rem 0.5rem;border-radius:100px">{{ $group['count'] }}</span>
+                                </div>
+                                {{-- Individual campers as pills --}}
+                                <div style="display:flex;flex-wrap:wrap;gap:0.35rem">
+                                    @foreach($group['codes'] as $code)
+                                        <div style="background:rgba(253,230,138,0.08);border:1px solid rgba(253,230,138,0.2);border-radius:8px;padding:0.25rem 0.65rem">
+                                            <span style="font-size:0.75rem;font-weight:600;color:#FEF3C7">{{ $code->prefill_name }}</span>
+                                            <span style="font-family:monospace;font-size:0.6rem;color:rgba(253,243,199,0.5);margin-left:4px">{{ $code->code }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+        </div>
+        {{-- ───────────────────────────────────────────────────────────────── --}}
 
         {{-- Dept breakdown --}}
         <div style="background:var(--d-bg-card);border:1px solid var(--d-border);border-radius:14px;padding:1rem 1.25rem;margin-bottom:1.25rem">
@@ -72,13 +143,19 @@
                 <table style="width:100%;border-collapse:collapse">
                     <thead style="position:sticky;top:0;background:#0F172A">
                     <tr style="border-bottom:1px solid var(--d-border)">
-                        @foreach(['Church','Total','Adv','PF','SY','Checked In','Consent ⚠',''] as $h)
+                        @foreach(['Church','Total','Adv','PF','SY','Checked In','Consent ⚠','Paid / Pending Reg',''] as $h)
                             <th style="padding:0.5rem 0.85rem;text-align:{{ $loop->first ? 'left' : ($loop->last ? 'left' : 'center') }};font-size:0.6rem;font-weight:700;color:var(--d-text-3);text-transform:uppercase;white-space:nowrap">{{ $h }}</th>
                         @endforeach
                     </tr>
                     </thead>
                     <tbody>
                     @forelse($churchStats as $i => $stat)
+                        @php
+                            // Active codes count for this specific church
+                            $churchActiveCodes = $activeCodesByChurch
+                                ->first(fn($g) => $g['church']?->id === $stat['church']->id);
+                            $churchActiveCount = $churchActiveCodes['count'] ?? 0;
+                        @endphp
                         <tr style="border-bottom:1px solid var(--d-border);{{ $i%2 ? 'background:var(--d-bg-hover)' : '' }}">
                             <td style="padding:0.6rem 0.85rem;font-weight:600;font-size:0.8rem;color:var(--d-text-2)">{{ $stat['church']->name }}</td>
                             <td style="padding:0.6rem 0.85rem;text-align:center;font-weight:800;color:var(--d-text)">{{ $stat['total'] }}</td>
@@ -86,12 +163,25 @@
                             <td style="padding:0.6rem 0.85rem;text-align:center;color:#34D399;font-weight:600;font-size:0.78rem">{{ $stat['pathfinders'] }}</td>
                             <td style="padding:0.6rem 0.85rem;text-align:center;color:#FBBF24;font-weight:600;font-size:0.78rem">{{ $stat['senior_youth'] }}</td>
                             <td style="padding:0.6rem 0.85rem;text-align:center">
-                                @if($stat['checked_in'] > 0)<span style="background:#052E16;color:var(--d-stat-2-tc);font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:100px">✅ {{ $stat['checked_in'] }}</span>
-                                @else<span style="color:var(--d-muted)">—</span>@endif
+                                @if($stat['checked_in'] > 0)
+                                    <span style="background:#052E16;color:var(--d-stat-2-tc);font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:100px">✅ {{ $stat['checked_in'] }}</span>
+                                @else
+                                    <span style="color:var(--d-muted)">—</span>
+                                @endif
                             </td>
                             <td style="padding:0.6rem 0.85rem;text-align:center">
-                                @if($stat['consent_pending'] > 0)<span style="background:#422006;color:var(--d-stat-3-tc);font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:100px">{{ $stat['consent_pending'] }}</span>
-                                @else<span style="color:var(--d-muted)">—</span>@endif
+                                @if($stat['consent_pending'] > 0)
+                                    <span style="background:#422006;color:var(--d-stat-3-tc);font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:100px">{{ $stat['consent_pending'] }}</span>
+                                @else
+                                    <span style="color:var(--d-muted)">—</span>
+                                @endif
+                            </td>
+                            <td style="padding:0.6rem 0.85rem;text-align:center">
+                                @if($churchActiveCount > 0)
+                                    <span style="background:#422006;color:#FCD34D;font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:100px">⏳ {{ $churchActiveCount }}</span>
+                                @else
+                                    <span style="color:var(--d-muted)">—</span>
+                                @endif
                             </td>
                             <td style="padding:0.6rem 0.85rem">
                                 <a href="{{ route('exports.campers', ['church_id' => $stat['church']->id]) }}" target="_blank" style="font-size:0.65rem;color:#818CF8;text-decoration:underline;margin-right:0.65rem">Export</a>
@@ -99,7 +189,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" style="padding:2rem;text-align:center;color:var(--d-text-3);font-style:italic">No campers registered yet.</td></tr>
+                        <tr><td colspan="9" style="padding:2rem;text-align:center;color:var(--d-text-3);font-style:italic">No campers registered yet.</td></tr>
                     @endforelse
                     </tbody>
                     <tfoot>
@@ -111,6 +201,7 @@
                         <td style="padding:0.6rem 0.85rem;text-align:center;font-weight:700;color:var(--d-stat-3-tc)">{{ $categoryBreakdown["senior_youth"] }}</td>
                         <td style="padding:0.6rem 0.85rem;text-align:center;font-weight:700;color:#fff">{{ $totalCheckedIn }}</td>
                         <td style="padding:0.6rem 0.85rem;text-align:center;font-weight:700;color:#fff">{{ $consentPending }}</td>
+                        <td style="padding:0.6rem 0.85rem;text-align:center;font-weight:700;color:#FCD34D">{{ $activeCodesCount > 0 ? $activeCodesCount : '—' }}</td>
                         <td></td>
                     </tr>
                     </tfoot>
