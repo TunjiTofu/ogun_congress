@@ -19,6 +19,7 @@ class RolesSeeder extends Seeder
             'camp_director',
             'admin',
             'media',
+            'skill_manager',
         ];
 
         foreach ($roles as $role) {

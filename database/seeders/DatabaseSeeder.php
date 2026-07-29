@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
             ClubRankSeeder::class,
             AdminUserSeeder::class,
             CampRoleSeeder::class,
+            SkillsSeeder::class,
         ]);
     }
 }

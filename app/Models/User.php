@@ -88,6 +88,7 @@ class User extends Authenticatable implements FilamentUser
                 'camp_director',
                 'admin',   // new: edit-only admin
                 'media',   // new: media manager
+                'skill_manager',
             ]);
     }
 
