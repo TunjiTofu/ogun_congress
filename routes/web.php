@@ -5,6 +5,7 @@ use App\Http\Controllers\CamperExportController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\RejectedPhotosExportController;
+use App\Http\Controllers\SkillRegistrationExportController;
 use App\Models\CampMedia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -193,11 +194,22 @@ Route::middleware(['auth'])->prefix('exports')->name('exports.')->group(function
         ->name('management-report');
     Route::get('rejected-photos', [RejectedPhotosExportController::class, 'export'])  // ← fixed
     ->name('rejected-photos');
+    Route::get('skill-registrations', [SkillRegistrationExportController::class, 'export'])
+        ->name('skill-registrations');
 });
 
 // ── Registration downloads API (polled by success page) ──────────────────────
 Route::get('/api/v1/registration/downloads/{identifier}', [RegistrationController::class, 'downloads'])
     ->name('registration.downloads');
+
+// Skill Acquisition Portal (public, session-based auth)
+Route::prefix('skills')->name('skills.')->group(function () {
+    Route::get('/',        [App\Http\Controllers\SkillController::class, 'index'])   ->name('index');
+    Route::post('/login',  [App\Http\Controllers\SkillController::class, 'login'])   ->name('login');
+    Route::get('/dashboard', [App\Http\Controllers\SkillController::class, 'dashboard'])->name('dashboard');
+    Route::post('/register', [App\Http\Controllers\SkillController::class, 'register'])->name('register');
+    Route::post('/logout',  [App\Http\Controllers\SkillController::class, 'logout']) ->name('logout');
+});
 
 // ── Admin artisan shortcuts (super_admin only) ────────────────────────────────
 Route::middleware(['auth'])->prefix('artisan')->name('artisan.')->group(function () {
@@ -247,6 +259,7 @@ Route::middleware(['auth'])->prefix('artisan')->name('artisan.')->group(function
             'DatabaseSeeder',
             'DistrictAndChurchSeeder',
             'CampRoleSeeder',
+            'SkillsSeeder',
         ];
 
         $class = request('class', 'RolesAndPermissionsSeeder');

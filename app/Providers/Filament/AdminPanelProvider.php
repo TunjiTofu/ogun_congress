@@ -14,6 +14,7 @@ use App\Filament\Pages\ChangePassword;
 use App\Filament\Pages\ForceChangePassword;
 use App\Filament\Pages\RegistrationControlPage;
 use App\Filament\Pages\Reports;
+use App\Filament\Pages\SkillDashboard;
 use App\Filament\Widgets\CategoryBreakdownWidget;
 use App\Filament\Widgets\RecentActivityWidget;
 use App\Filament\Widgets\RegistrationsByDayWidget;
@@ -60,6 +61,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make('Payments'),
                 NavigationGroup::make('Campers'),
                 NavigationGroup::make('Camp Operations'),
+                NavigationGroup::make('Skill Acquisition'),
                 NavigationGroup::make('Reports & Settings'),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
@@ -78,6 +80,7 @@ class AdminPanelProvider extends PanelProvider
                 RegistrationControlPage::class,
                 ForceChangePassword::class,
                 ChangePassword::class,
+                SkillDashboard::class,
             ])
             ->widgets([
                 StatsOverviewWidget::class,
@@ -100,6 +103,13 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
                 \App\Http\Middleware\ForcePasswordChange::class,
             ])
+            ->homeUrl(fn () => match (true) {
+                auth()->user()?->hasRole('skill_manager') => SkillDashboard::getUrl(),
+                auth()->user()?->hasRole('church_coordinator') => CoordinatorDashboard::getUrl(),
+                auth()->user()?->hasRole('district_coordinator') => DistrictCoordinatorDashboard::getUrl(),
+                auth()->user()?->hasRole('accountant') => AccountantDashboard::getUrl(),
+                default => Dashboard::getUrl(),
+            })
             ->maxContentWidth('full')
             ->sidebarCollapsibleOnDesktop()
             ->userMenuItems([
