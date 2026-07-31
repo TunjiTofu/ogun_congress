@@ -6,6 +6,7 @@ use App\Filament\Resources\SkillResource\Pages;
 use App\Models\Skill;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\DB;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class SkillResource extends Resource
 {
-    protected static ?string $model = Skill::class;
+    protected static ?string $model           = Skill::class;
     protected static ?string $navigationIcon  = 'heroicon-o-academic-cap';
     protected static ?string $navigationGroup = 'Skill Acquisition';
     protected static ?string $navigationLabel = 'Skills';
@@ -82,9 +83,29 @@ class SkillResource extends Resource
                 ->options(['active' => 'Active', 'inactive' => 'Inactive'])
                 ->default('active')->required(),
 
-            Textarea::make('description')->rows(2)->columnSpanFull(),
-            Textarea::make('requirement')->rows(2)->columnSpanFull(),
-            Textarea::make('curriculum')->rows(4)->columnSpanFull(),
+            Textarea::make('description')
+                ->rows(2)
+                ->columnSpanFull(),
+
+            RichEditor::make('requirement')
+                ->label('Requirements')
+                ->toolbarButtons([
+                    'bold', 'italic', 'underline',
+                    'bulletList', 'orderedList',
+                    'h3',
+                    'blockquote',
+                ])
+                ->columnSpanFull(),
+
+            RichEditor::make('curriculum')
+                ->label('Curriculum / What They Will Learn')
+                ->toolbarButtons([
+                    'bold', 'italic', 'underline',
+                    'bulletList', 'orderedList',
+                    'h2', 'h3',
+                    'blockquote',
+                ])
+                ->columnSpanFull(),
         ])->columns(2);
     }
 
