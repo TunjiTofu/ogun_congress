@@ -81,7 +81,93 @@
             .profile-card{flex-direction:column;align-items:flex-start}
             .skill-grid{grid-template-columns:1fr}
         }
+
+        /* ── Rich text content ── */
+        .rich-content { font-size:.8rem; color:var(--text); line-height:1.6; }
+        .rich-content p { margin-bottom:.5rem; }
+        .rich-content p:last-child { margin-bottom:0; }
+        .rich-content ul, .rich-content ol { padding-left:1.25rem; margin-bottom:.5rem; }
+        .rich-content li { margin-bottom:.2rem; }
+        .rich-content strong { font-weight:700; }
+        .rich-content em { font-style:italic; }
+        .rich-content h2,.rich-content h3 { font-size:.85rem; font-weight:700; color:var(--navy); margin-bottom:.35rem; margin-top:.5rem; }
+        .rich-content blockquote { border-left:3px solid var(--gold); padding-left:.75rem; color:var(--muted); font-style:italic; margin:.5rem 0; }
+        .req-preview { font-size:.78rem; color:var(--muted); line-height:1.5; }
+        /* Short rich HTML in card — constrain height and clip overflow cleanly */
+        .req-short { display:block; }
+        .req-short p, .req-short li { font-size:.78rem; color:var(--muted); margin-bottom:.2rem; }
+        .req-short ul, .req-short ol { padding-left:1.1rem; }
+        .req-short h2, .req-short h3 { font-size:.8rem; font-weight:700; color:var(--navy); }
+
+        /* ── Read more button ── */
+        .read-more-btn {
+            background:none; border:none; cursor:pointer;
+            color:var(--navy); font-size:.75rem; font-weight:700;
+            text-decoration:underline; padding:0; margin-left:3px;
+            font-family:inherit;
+        }
+        .read-more-btn:hover { color:var(--gold); }
+
+        /* ── Modal ── */
+        .skill-modal {
+            display:none; position:fixed; inset:0;
+            background:rgba(0,0,0,.55); z-index:9999;
+            align-items:center; justify-content:center; padding:1.25rem;
+        }
+        .skill-modal.open { display:flex; }
+        .skill-modal-box {
+            background:#fff; border-radius:16px; max-width:560px; width:100%;
+            max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25);
+            position:relative;
+        }
+        .skill-modal-header {
+            padding:1.25rem 1.25rem .85rem;
+            border-bottom:1px solid var(--border);
+            position:sticky; top:0; background:#fff; z-index:1;
+        }
+        .skill-modal-header h3 { font-family:'Fraunces',Georgia,serif; font-size:1.05rem; font-weight:700; color:var(--navy); margin-bottom:.2rem; }
+        .skill-modal-header p  { font-size:.72rem; color:var(--muted); }
+        .skill-modal-body { padding:1.25rem; }
+        .skill-modal-section { margin-bottom:1.1rem; }
+        .skill-modal-section:last-child { margin-bottom:0; }
+        .skill-modal-section-label { font-size:.6rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin-bottom:.5rem; }
+        .modal-close-btn {
+            position:absolute; top:.85rem; right:.85rem;
+            background:var(--cream); border:1px solid var(--border);
+            border-radius:50%; width:28px; height:28px;
+            cursor:pointer; font-size:.85rem; color:var(--muted);
+            display:flex; align-items:center; justify-content:center;
+            line-height:1;
+        }
+        .modal-close-btn:hover { background:var(--border); color:var(--text); }
     </style>
+
+    <script>
+        function openSkillModal(id) {
+            document.getElementById(id).classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeSkillModal(id) {
+            document.getElementById(id).classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        // Close on backdrop click
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('skill-modal')) {
+                e.target.classList.remove('open');
+                document.body.style.overflow = '';
+            }
+        });
+        // Close on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.skill-modal.open').forEach(function(m) {
+                    m.classList.remove('open');
+                });
+                document.body.style.overflow = '';
+            }
+        });
+    </script>
 </head>
 <body>
 
@@ -186,7 +272,66 @@
                                 <div class="skill-detail"><span class="skill-detail-icon">&#128100;</span><span>{{ $skill->facilitator }}</span></div>
                             @endif
                             @if($skill->requirement)
-                                <div class="skill-detail"><span class="skill-detail-icon">&#128196;</span><span>{{ $skill->requirement }}</span></div>
+                                @php
+                                    // Decode HTML entities first so &nbsp; etc. become real chars,
+                                    // then strip tags — otherwise {{ }} double-escapes the & in entities
+                                    $reqText   = strip_tags(html_entity_decode($skill->requirement ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                                    $reqIsLong = mb_strlen($reqText) > 200;
+                                    $reqModal  = 'modal-req-' . $skill->id;
+                                @endphp
+                                <div class="skill-detail">
+                                    <span class="skill-detail-icon">&#128196;</span>
+                                    <span>
+                                        @if($reqIsLong)
+                                            {{-- Plain decoded preview with no raw entities --}}
+                                            <span class="req-preview">{{ mb_substr($reqText, 0, 180) }}&hellip; </span>
+                                            <button class="read-more-btn" onclick="openSkillModal('{{ $reqModal }}')">Read more</button>
+                                        @else
+                                            {{-- Short enough to show formatted HTML directly --}}
+                                            <span class="rich-content req-short">{!! $skill->requirement !!}</span>
+                                        @endif
+                                    </span>
+                                </div>
+
+                                @if($reqIsLong)
+                                    {{-- Modal --}}
+                                    <div id="{{ $reqModal }}" class="skill-modal" role="dialog" aria-modal="true">
+                                        <div class="skill-modal-box">
+                                            <button class="modal-close-btn" onclick="closeSkillModal('{{ $reqModal }}')" aria-label="Close">&times;</button>
+                                            <div class="skill-modal-header">
+                                                <h3>{{ $skill->name }}</h3>
+                                                @php
+                                                    $modalMeta = array_filter([
+                                                        $skill->categoryLabel(),
+                                                        $skill->club_rank ?: null,
+                                                        $skill->facilitator ?: null,
+                                                    ]);
+                                                @endphp
+                                                <p>{{ implode(' · ', $modalMeta) }}</p>
+                                            </div>
+                                            <div class="skill-modal-body">
+                                                <div class="skill-modal-section">
+                                                    <div class="skill-modal-section-label">&#128196; Requirements</div>
+                                                    <div class="rich-content">{!! $skill->requirement !!}</div>
+                                                </div>
+                                                @if($skill->curriculum)
+                                                    <div class="skill-modal-section">
+                                                        <div class="skill-modal-section-label">&#128218; Curriculum</div>
+                                                        <div class="rich-content">{!! $skill->curriculum !!}</div>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            {{-- Bottom close button for easy access --}}
+                                            <div style="padding:.75rem 1.25rem 1.25rem;text-align:center">
+                                                <button
+                                                    onclick="closeSkillModal('{{ $reqModal }}')"
+                                                    style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:.6rem 2rem;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">
+                                                    Close
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
                             @endif
                             <div class="skill-slots {{ $isLow ? 'slots-low' : 'slots-ok' }}">
                                 &#128065; {{ $skill->remainingSlots() }} slot{{ $skill->remainingSlots() !== 1 ? 's' : '' }} remaining
@@ -219,7 +364,66 @@
                                 <div class="skill-detail"><span class="skill-detail-icon">&#128100;</span><span>{{ $skill->facilitator }}</span></div>
                             @endif
                             @if($skill->requirement)
-                                <div class="skill-detail"><span class="skill-detail-icon">&#128196;</span><span>{{ $skill->requirement }}</span></div>
+                                @php
+                                    // Decode HTML entities first so &nbsp; etc. become real chars,
+                                    // then strip tags — otherwise {{ }} double-escapes the & in entities
+                                    $reqText   = strip_tags(html_entity_decode($skill->requirement ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                                    $reqIsLong = mb_strlen($reqText) > 200;
+                                    $reqModal  = 'modal-req-' . $skill->id;
+                                @endphp
+                                <div class="skill-detail">
+                                    <span class="skill-detail-icon">&#128196;</span>
+                                    <span>
+                                        @if($reqIsLong)
+                                            {{-- Plain decoded preview with no raw entities --}}
+                                            <span class="req-preview">{{ mb_substr($reqText, 0, 180) }}&hellip; </span>
+                                            <button class="read-more-btn" onclick="openSkillModal('{{ $reqModal }}')">Read more</button>
+                                        @else
+                                            {{-- Short enough to show formatted HTML directly --}}
+                                            <span class="rich-content req-short">{!! $skill->requirement !!}</span>
+                                        @endif
+                                    </span>
+                                </div>
+
+                                @if($reqIsLong)
+                                    {{-- Modal --}}
+                                    <div id="{{ $reqModal }}" class="skill-modal" role="dialog" aria-modal="true">
+                                        <div class="skill-modal-box">
+                                            <button class="modal-close-btn" onclick="closeSkillModal('{{ $reqModal }}')" aria-label="Close">&times;</button>
+                                            <div class="skill-modal-header">
+                                                <h3>{{ $skill->name }}</h3>
+                                                @php
+                                                    $modalMeta = array_filter([
+                                                        $skill->categoryLabel(),
+                                                        $skill->club_rank ?: null,
+                                                        $skill->facilitator ?: null,
+                                                    ]);
+                                                @endphp
+                                                <p>{{ implode(' · ', $modalMeta) }}</p>
+                                            </div>
+                                            <div class="skill-modal-body">
+                                                <div class="skill-modal-section">
+                                                    <div class="skill-modal-section-label">&#128196; Requirements</div>
+                                                    <div class="rich-content">{!! $skill->requirement !!}</div>
+                                                </div>
+                                                @if($skill->curriculum)
+                                                    <div class="skill-modal-section">
+                                                        <div class="skill-modal-section-label">&#128218; Curriculum</div>
+                                                        <div class="rich-content">{!! $skill->curriculum !!}</div>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            {{-- Bottom close button for easy access --}}
+                                            <div style="padding:.75rem 1.25rem 1.25rem;text-align:center">
+                                                <button
+                                                    onclick="closeSkillModal('{{ $reqModal }}')"
+                                                    style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:.6rem 2rem;font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit">
+                                                    Close
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
                             @endif
                             <div class="skill-slots {{ $isLow ? 'slots-low' : 'slots-ok' }}">
                                 &#128065; {{ $skill->remainingSlots() }} slot{{ $skill->remainingSlots() !== 1 ? 's' : '' }} remaining
