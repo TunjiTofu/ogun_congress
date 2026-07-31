@@ -51,16 +51,26 @@ class SkillResource extends Resource
             TextInput::make('name')
                 ->required()->maxLength(255)->columnSpanFull(),
 
-            Select::make('category')
-                ->label('Category Restriction')
+            \Filament\Forms\Components\CheckboxList::make('target_categories')
+                ->label('Available To (select all that apply)')
                 ->options([
-                    ''             => 'General (available to all)',
-                    'adventurer'   => 'Adventurers only',
-                    'pathfinder'   => 'Pathfinders only',
-                    'senior_youth' => 'Senior Youth only',
+                    'adventurer'   => 'Adventurers',
+                    'pathfinder'   => 'Pathfinders',
+                    'senior_youth' => 'Senior Youth',
+                ])
+                ->helperText('Select which departments can register for this skill. Leave all unchecked to use the legacy Category field below.')
+                ->columns(3),
+
+            Select::make('category')
+                ->label('Legacy Category (used only if Available To is empty)')
+                ->options([
+                    ''             => 'General (all)',
+                    'adventurer'   => 'Adventurers',
+                    'pathfinder'   => 'Pathfinders',
+                    'senior_youth' => 'Senior Youth',
                 ])
                 ->default('')
-                ->helperText('Leave as General to make this skill available to every camper.'),
+                ->helperText('Prefer using "Available To" above.'),
 
             Select::make('club_rank')
                 ->label('Club Rank Restriction')
