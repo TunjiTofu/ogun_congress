@@ -10,6 +10,10 @@ class Skill extends Model
 {
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'target_categories' => 'array',
+    ];
+
     // ── Relationships ────────────────────────────────────────────────────────
 
     public function registrations(): HasMany
@@ -36,11 +40,22 @@ class Skill extends Model
 
     public function isGeneral(): bool
     {
-        return $this->category === null;
+        return empty($this->target_categories) && $this->category === null;
     }
 
     public function categoryLabel(): string
     {
+        // Use target_categories first (new multi-category field)
+        if (! empty($this->target_categories)) {
+            $labels = array_map(fn ($c) => match ($c) {
+                'adventurer'   => 'Adventurers',
+                'pathfinder'   => 'Pathfinders',
+                'senior_youth' => 'Senior Youth',
+                default        => ucfirst($c),
+            }, $this->target_categories);
+            return implode(' & ', $labels);
+        }
+
         return match ($this->category) {
             'adventurer'   => 'Adventurers',
             'pathfinder'   => 'Pathfinders',
@@ -62,18 +77,26 @@ class Skill extends Model
         $query
             ->where('status', 'active')
             ->where(function ($q) use ($catValue, $camper) {
-                // General: no category restriction
-                $q->whereNull('category')
-                    // Category-specific (with optional rank filter)
+                // New: target_categories JSON array contains camper's category
+                $q->where(function ($q2) use ($catValue) {
+                    $q2->whereNotNull('target_categories')
+                        ->whereJsonContains('target_categories', $catValue);
+                })
+                    // Legacy fallback: use the old single category column
                     ->orWhere(function ($q2) use ($catValue, $camper) {
-                        $q2->where('category', $catValue)
-                            ->where(function ($q3) use ($camper) {
-                                $q3->whereNull('club_rank')
-                                    ->orWhere('club_rank', $camper->club_rank);
+                        $q2->whereNull('target_categories')
+                            ->where(function ($q3) use ($catValue, $camper) {
+                                $q3->whereNull('category')
+                                    ->orWhere(function ($q4) use ($catValue, $camper) {
+                                        $q4->where('category', $catValue)
+                                            ->where(function ($q5) use ($camper) {
+                                                $q5->whereNull('club_rank')
+                                                    ->orWhere('club_rank', $camper->club_rank);
+                                            });
+                                    });
                             });
                     });
             })
-            // Only skills with remaining capacity
             ->where('maximum_attendees', '>', function ($sub) {
                 $sub->selectRaw('COUNT(*)')
                     ->from('camper_skill_registrations')
