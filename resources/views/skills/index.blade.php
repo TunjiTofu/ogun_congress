@@ -34,8 +34,14 @@
         .alert{padding:.75rem 1rem;border-radius:8px;font-size:.82rem;margin-bottom:1rem}
         .alert-error{background:#FEF2F2;border:1px solid #FECACA;color:var(--red)}
         .alert-info{background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF}
-        .hint{font-size:.72rem;color:var(--muted);text-align:center;margin-top:.75rem}
+        .hint{font-size:.72rem;color:var(--muted);text-align:center;margin-top:.75rem;line-height:1.6}
         .hint code{background:var(--cream);padding:.1rem .4rem;border-radius:4px;font-family:monospace;color:var(--text)}
+        /* Code entry split layout */
+        .code-wrap{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:10px;background:var(--paper);overflow:hidden;transition:.2s}
+        .code-wrap:focus-within{border-color:var(--navy);background:#fff}
+        .code-prefix{padding:.85rem .75rem .85rem 1rem;font-family:monospace;font-size:.9rem;font-weight:700;color:var(--muted);background:var(--cream);border-right:1.5px solid var(--border);white-space:nowrap;user-select:none;flex-shrink:0}
+        .code-suffix-input{border:none!important;border-radius:0!important;background:transparent!important;flex:1;padding:.85rem .85rem .85rem .65rem;font-size:1.05rem;font-weight:700;letter-spacing:.15em;text-align:left;min-width:0;outline:none!important}
+        .code-suffix-input::placeholder{font-weight:400;letter-spacing:.08em;color:var(--muted)}
         .main{flex:1;padding:2.5rem 1.5rem;display:flex;align-items:center;justify-content:center}
         footer{text-align:center;padding:1.5rem;font-size:.72rem;color:var(--muted)}
     </style>
@@ -64,25 +70,47 @@
             <div class="alert alert-info">{{ session('info') }}</div>
         @endif
 
-        <form method="POST" action="{{ route('skills.login') }}">
+        <form method="POST" action="{{ route('skills.login') }}" onsubmit="combineCode(this)">
             @csrf
-            <label class="form-label" for="code">Your Registration Code</label>
-            <input
-                id="code" name="code" type="text"
-                class="form-input"
-                placeholder="OGN-2026-XXXXXX"
-                maxlength="15"
-                autocomplete="off"
-                spellcheck="false"
-                oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9\-]/g,'')"
-                value="{{ old('code') }}"
-                required
-            />
+            {{-- Hidden field that holds the full combined code on submit --}}
+            <input type="hidden" name="code" id="code-full"/>
+
+            <label class="form-label" for="code-suffix">Your Registration Code</label>
+
+            <div class="code-wrap">
+                <span class="code-prefix">OGN-2026-</span>
+                <input
+                    id="code-suffix"
+                    type="text"
+                    class="form-input code-suffix-input"
+                    placeholder="XXXXXX"
+                    maxlength="6"
+                    autocomplete="off"
+                    spellcheck="false"
+                    inputmode="text"
+                    oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')"
+                    value="{{ old('code') ? substr(old('code'), 9) : '' }}"
+                    required
+                />
+            </div>
+
             @error('code')<p style="color:var(--red);font-size:.78rem;margin-top:.4rem">{{ $message }}</p>@enderror
             <button type="submit" class="btn">Continue &rarr;</button>
         </form>
 
-        <p class="hint">Use the same code you received when you registered for camp. Format: <code>OGN-2026-XXXXXX</code></p>
+        <p class="hint">Enter the last 6 characters of your registration code.<br/>Format: <code>OGN-2026-<strong>XXXXXX</strong></code></p>
+
+        <script>
+            function combineCode(form) {
+                var suffix = document.getElementById('code-suffix').value.trim().toUpperCase();
+                document.getElementById('code-full').value = 'OGN-2026-' + suffix;
+            }
+            // Auto-move focus to suffix field on page load
+            document.addEventListener('DOMContentLoaded', function() {
+                var el = document.getElementById('code-suffix');
+                if (el) el.focus();
+            });
+        </script>
     </div>
 </main>
 
