@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\CamperSkillRegistration;
 use App\Models\CampSetting;
 use App\Models\Skill;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class SkillsSeeder extends Seeder
 {
@@ -186,10 +188,10 @@ class SkillsSeeder extends Seeder
         ];
 
         // Wipe old skill records — disable FK checks first to allow truncate
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        \App\Models\CamperSkillRegistration::truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        CamperSkillRegistration::truncate();
         Skill::truncate();
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         foreach ($skills as $data) {
             Skill::create(array_merge($data, [
