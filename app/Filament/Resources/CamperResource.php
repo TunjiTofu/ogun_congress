@@ -307,24 +307,51 @@ class CamperResource extends Resource
                     Forms\Components\Select::make('district_id')
                         ->label('District')
                         ->options(District::orderBy('name')->pluck('name', 'id'))
-                        ->live()->afterStateUpdated(fn (Forms\Set $set) => $set('church_id', null))
+                        ->live()
+                        ->afterStateHydrated(function ($component, $record) {
+                            if ($record?->church_id) {
+                                $component->state(
+                                    \App\Models\Church::find($record->church_id)?->district_id
+                                );
+                            }
+                        })
+                        ->afterStateUpdated(fn (Forms\Set $set) => $set('church_id', null))
                         ->dehydrated(false),
                     Forms\Components\Select::make('church_id')
                         ->label('Church')
-                        ->options(fn (Get $get) => Church::where('district_id', $get('district_id'))
-                            ->orderBy('name')->pluck('name', 'id'))
-                        ->searchable(),
-                    Forms\Components\TextInput::make('ministry')->maxLength(100),
-                    Forms\Components\TextInput::make('club_rank')->label('Club Rank')->maxLength(100),
+                        ->options(fn (Get $get) => $get('district_id')
+                            ? Church::where('district_id', $get('district_id'))
+                                ->orderBy('name')->pluck('name', 'id')
+                            : Church::orderBy('name')->pluck('name', 'id'))
+                        ->searchable()
+                        ->required(),
+                    Forms\Components\Select::make('ministry')
+                        ->label('Ministry')
+                        ->options(fn () => \Illuminate\Support\Facades\DB::table('campers')
+                            ->whereNotNull('ministry')->where('ministry', '!=', '')
+                            ->distinct()->orderBy('ministry')
+                            ->pluck('ministry', 'ministry')->toArray())
+                        ->searchable()
+                        ->createOptionUsing(fn (string $value) => $value)
+                        ->placeholder('Select or type a ministry'),
+                    Forms\Components\Select::make('club_rank')
+                        ->label('Club Rank')
+                        ->options(fn () => \Illuminate\Support\Facades\DB::table('club_ranks')
+                            ->orderBy('rank_name')->pluck('rank_name', 'rank_name')->toArray())
+                        ->searchable()
+                        ->placeholder('Select a rank'),
                 ]),
 
             Forms\Components\Section::make('Additional Info')
                 ->visibleOn('edit')
                 ->visible(fn () => auth()->user()->hasRole('super_admin'))
                 ->schema([
-                    Forms\Components\TextInput::make('volunteer_role')
-                        ->label('Volunteer Role')->maxLength(100)
-                        ->placeholder('e.g. Song Leader, Sabbath School Teacher'),
+                    Forms\Components\Select::make('volunteer_role')
+                        ->label('Volunteer Role')
+                        ->options(fn () => \Illuminate\Support\Facades\DB::table('camp_roles')
+                            ->orderBy('name')->pluck('name', 'name')->toArray())
+                        ->searchable()
+                        ->placeholder('Select a camp role'),
                     Forms\Components\TextInput::make('badge_color')
                         ->label('Custom Badge Colour (hex)')->placeholder('#1B3A8F')
                         ->helperText('Overrides department colour on ID card. Leave blank for default.'),
@@ -496,22 +523,73 @@ class CamperResource extends Resource
                         redirect($url);
                     }),
 
-                // ── Regenerate All Documents ──────────────────────────────
+                // ── Regenerate Documents (with filters) ───────────────────
                 Tables\Actions\Action::make('regenerate_all')
-                    ->label('Regenerate All ID Cards')
+                    ->label('Regenerate ID Cards')
                     ->icon('heroicon-o-arrow-path')->color('warning')
                     ->visible($isSuperAdmin)
-                    ->requiresConfirmation()
-                    ->modalHeading('Regenerate All ID Cards & Consent Forms?')
-                    ->modalDescription('Queues document generation for every camper. Requires queue worker running. If QUEUE_CONNECTION=sync in .env, run: php artisan queue:work')
-                    ->modalSubmitActionLabel('Yes, Regenerate All')
-                    ->action(function () {
-                        $ids = \App\Models\Camper::pluck('id');
+                    ->modalHeading('Regenerate ID Cards & Consent Forms')
+                    ->modalDescription('Filter by district, church, or department. Leave all blank to regenerate for every camper.')
+                    ->modalSubmitActionLabel('Queue Regeneration')
+                    ->form([
+                        Forms\Components\Select::make('district_id')
+                            ->label('District (optional)')
+                            ->options(District::orderBy('name')->pluck('name', 'id'))
+                            ->live()
+                            ->afterStateUpdated(fn (Forms\Set $set) => $set('church_id', null))
+                            ->placeholder('All districts')
+                            ->nullable(),
+
+                        Forms\Components\Select::make('church_id')
+                            ->label('Local Church (optional)')
+                            ->options(fn (Get $get) => $get('district_id')
+                                ? Church::where('district_id', $get('district_id'))
+                                    ->orderBy('name')->pluck('name', 'id')
+                                : Church::orderBy('name')->pluck('name', 'id'))
+                            ->searchable()
+                            ->placeholder('All churches')
+                            ->nullable(),
+
+                        Forms\Components\Select::make('category')
+                            ->label('Department (optional)')
+                            ->options(collect(CamperCategory::cases())
+                                ->mapWithKeys(fn ($e) => [$e->value => $e->label()])->toArray())
+                            ->placeholder('All departments')
+                            ->nullable(),
+                    ])
+                    ->action(function (array $data) {
+                        $query = \App\Models\Camper::query();
+
+                        if (! empty($data['district_id'])) {
+                            $churchIds = Church::where('district_id', $data['district_id'])->pluck('id');
+                            $query->whereIn('church_id', $churchIds);
+                        }
+
+                        if (! empty($data['church_id'])) {
+                            $query->where('church_id', $data['church_id']);
+                        }
+
+                        if (! empty($data['category'])) {
+                            $query->where('category', $data['category']);
+                        }
+
+                        $ids   = $query->pluck('id');
+                        $count = $ids->count();
+
+                        if ($count === 0) {
+                            Notification::make()
+                                ->title('No campers matched the selected filters.')
+                                ->warning()->send();
+                            return;
+                        }
+
                         foreach ($ids as $id) {
                             \App\Jobs\GenerateCamperDocumentsJob::dispatch($id)->onQueue('documents');
                         }
+
                         Notification::make()
-                            ->title("Queued {$ids->count()} campers for regeneration.")
+                            ->title("Queued {$count} camper(s) for document regeneration.")
+                            ->body('ID cards and consent forms will be regenerated in the background.')
                             ->success()->send();
                     }),
             ])
@@ -585,13 +663,13 @@ class CamperResource extends Resource
                     ->requiresConfirmation()
                     ->modalDescription("This will restore the camper's regular department ID card.")
                     ->action(function (Camper $record) {
-        $record->update([
-            'is_official'  => false,
-            'camp_role_id' => null,
-        ]);
-        \App\Jobs\GenerateCamperDocumentsJob::dispatch($record->id);
-        Notification::make()->title('Official status removed. ID card will regenerate.')->success()->send();
-    }),
+                        $record->update([
+                            'is_official'  => false,
+                            'camp_role_id' => null,
+                        ]);
+                        \App\Jobs\GenerateCamperDocumentsJob::dispatch($record->id);
+                        Notification::make()->title('Official status removed. ID card will regenerate.')->success()->send();
+                    }),
 
                 Tables\Actions\Action::make('approve_photo')
                     ->label('Approve Photo')->icon('heroicon-o-check-circle')->color('success')
@@ -632,33 +710,33 @@ class CamperResource extends Resource
                     }),
             ])
             ->bulkActions([
-        Tables\Actions\BulkActionGroup::make([
-            Tables\Actions\BulkAction::make('bulk_approve')
-                ->label('Approve Photos')->icon('heroicon-o-check-circle')->color('success')
-                ->visible($isSuperAdmin)
-                ->action(function ($records) {
-                    $records->each(function ($r) {
-                        $r->update(['photo_status' => 'approved']);
-                        \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id);
-                    });
-                    Notification::make()->title('Photos approved.')->success()->send();
-                }),
-            Tables\Actions\BulkAction::make('bulk_regenerate')
-                ->label('Regenerate Documents')
-                ->icon('heroicon-o-arrow-path')
-                ->color('gray')
-                ->visible($isSuperAdmin)
-                ->requiresConfirmation()
-                ->modalDescription('This will queue document regeneration for all selected campers.')
-                ->action(function ($records) {
-                    $records->each(fn ($r) => \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id));
-                    Notification::make()
-                        ->title($records->count() . ' campers queued for regeneration.')
-                        ->success()->send();
-                }),
-            Tables\Actions\DeleteBulkAction::make()->visible($isSuperAdmin),
-        ]),
-    ]);
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('bulk_approve')
+                        ->label('Approve Photos')->icon('heroicon-o-check-circle')->color('success')
+                        ->visible($isSuperAdmin)
+                        ->action(function ($records) {
+                            $records->each(function ($r) {
+                                $r->update(['photo_status' => 'approved']);
+                                \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id);
+                            });
+                            Notification::make()->title('Photos approved.')->success()->send();
+                        }),
+                    Tables\Actions\BulkAction::make('bulk_regenerate')
+                        ->label('Regenerate Documents')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('gray')
+                        ->visible($isSuperAdmin)
+                        ->requiresConfirmation()
+                        ->modalDescription('This will queue document regeneration for all selected campers.')
+                        ->action(function ($records) {
+                            $records->each(fn ($r) => \App\Jobs\GenerateCamperDocumentsJob::dispatch($r->id));
+                            Notification::make()
+                                ->title($records->count() . ' campers queued for regeneration.')
+                                ->success()->send();
+                        }),
+                    Tables\Actions\DeleteBulkAction::make()->visible($isSuperAdmin),
+                ]),
+            ]);
     }
 
     public static function getRelationManagers(): array

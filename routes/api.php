@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Route;
 
 require __DIR__ . '/dev-route.php';
 
-// ── Public webhook (no auth, no CSRF — excluded in bootstrap/app.php) ─────────
+// ── Public webhook (no auth, no CSRF — excluded in bootstrap/app.php) ────────-─
 Route::post('/webhooks/paystack', [PaymentController::class, 'webhook'])
     ->name('webhooks.paystack');
 
