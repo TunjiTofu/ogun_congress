@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\Storage;
 
 class BulkIdCardController extends Controller
 {
-    private const CARDS_PER_PAGE  = 6;    // 2 col × 3 row on A4
-    private const CHUNK_SIZE      = 30;   // campers per PDF chunk (5 pages)
+    private const CARDS_PER_PAGE  = 6;
+    private const CHUNK_SIZE      = 150;  // raised — avoids PDF merging for most exports
     private const MEMORY_LIMIT    = '512M';
 
     private array $departmentColors = [
@@ -37,14 +37,11 @@ class BulkIdCardController extends Controller
             abort(404, 'No campers match the selected filters.');
         }
 
-        // For small batches (≤30) stream directly
         if ($total <= self::CHUNK_SIZE) {
             return $this->streamDirect($query->get(), $request);
         }
 
-        // For large batches — dispatch a queue job and redirect to status page
         $jobKey = $this->dispatchBulkJob($query->get(), $request, $total);
-
         return redirect()->route('exports.id-cards.status', ['key' => $jobKey]);
     }
 
@@ -96,10 +93,6 @@ class BulkIdCardController extends Controller
         return $query;
     }
 
-    /**
-     * Stream a PDF directly for small batches.
-     * Raises memory limit for the duration of the request only.
-     */
     private function streamDirect($campers, Request $request): \Symfony\Component\HttpFoundation\Response
     {
         ini_set('memory_limit', self::MEMORY_LIMIT);
@@ -118,31 +111,25 @@ class BulkIdCardController extends Controller
         ])
             ->setPaper('a4', 'portrait')
             ->setOptions([
-                'dpi'                  => 96,   // lowered from 150 — saves ~40% memory
-                'isHtml5ParserEnabled' => false, // disable HTML5 parser — was causing the OOM
-                'isRemoteEnabled'      => false,
+                'dpi'                     => 150,   // increased from 96 for print quality
+                'isHtml5ParserEnabled'    => false,
+                'isRemoteEnabled'         => false,
                 'isFontSubsettingEnabled' => true,
             ]);
 
         $filename = $this->makeFilename($request);
-
         return $pdf->download($filename);
     }
 
-    /**
-     * For large exports: split into chunks, generate separate PDFs,
-     * merge with Ghostscript if available, otherwise zip them.
-     * Dispatches to queue.
-     */
     private function dispatchBulkJob($campers, Request $request, int $total): string
     {
         $key = \Illuminate\Support\Str::uuid()->toString();
 
         Cache::put("id_card_export:{$key}", [
-            'status'   => 'queued',
-            'total'    => $total,
-            'filename' => $this->makeFilename($request),
-            'queued_at'=> now()->toDateTimeString(),
+            'status'    => 'queued',
+            'total'     => $total,
+            'filename'  => $this->makeFilename($request),
+            'queued_at' => now()->toDateTimeString(),
         ], now()->addHours(2));
 
         \App\Jobs\GenerateBulkIdCardsJob::dispatch($campers->pluck('id'), $key, $this->makeFilename($request));
@@ -181,9 +168,7 @@ class BulkIdCardController extends Controller
     private function encodeLogo(): string
     {
         $path = public_path('images/congress_logo.png');
-        if (! file_exists($path)) {
-            return '';
-        }
+        if (! file_exists($path)) return '';
         return 'data:image/png;base64,' . base64_encode(file_get_contents($path));
     }
 
@@ -191,29 +176,41 @@ class BulkIdCardController extends Controller
     {
         try {
             $media = $c->getFirstMedia('photo');
-            if (! $media) {
-                return null;
-            }
+            if (! $media) return null;
 
-            $path = ($media->hasGeneratedConversion('thumb') && file_exists($media->getPath('thumb')))
-                ? $media->getPath('thumb')
-                : $media->getPath();
+            // Always use the full-resolution original — thumb is too small for print
+            $path = $media->getPath();
+            if (! file_exists($path)) return null;
 
-            if (! file_exists($path)) {
-                return null;
-            }
-
-            // Resize to thumbnail to save memory — 120×120 is plenty for a card
             if (extension_loaded('gd')) {
-                $src  = imagecreatefromstring(file_get_contents($path));
+                $src = @imagecreatefromstring(file_get_contents($path));
                 if ($src) {
-                    $thumb = imagecreatetruecolor(120, 120);
-                    imagecopyresampled($thumb, $src, 0, 0, 0, 0, 120, 120, imagesx($src), imagesy($src));
-                    ob_start();
-                    imagejpeg($thumb, null, 80);
-                    $jpeg = ob_get_clean();
+                    $srcW = imagesx($src);
+                    $srcH = imagesy($src);
+
+                    // Pre-crop to 19:24 card photo box ratio — top-centre bias for faces
+                    // DomPDF ignores object-fit, so cropping must happen here in PHP
+                    $targetRatio = 19 / 24;
+                    if ($srcW / $srcH > $targetRatio) {
+                        $cropH = $srcH;
+                        $cropW = (int) round($srcH * $targetRatio);
+                    } else {
+                        $cropW = $srcW;
+                        $cropH = (int) round($srcW / $targetRatio);
+                    }
+                    $cropX = (int) round(($srcW - $cropW) / 2);
+                    $cropY = (int) round(($srcH - $cropH) * 0.15);
+
+                    $dst   = imagecreatetruecolor(426, 544);
+                    $white = imagecolorallocate($dst, 255, 255, 255);
+                    imagefill($dst, 0, 0, $white);
+                    imagecopyresampled($dst, $src, 0, 0, $cropX, $cropY, 426, 544, $cropW, $cropH);
                     imagedestroy($src);
-                    imagedestroy($thumb);
+
+                    ob_start();
+                    imagejpeg($dst, null, 92);
+                    $jpeg = ob_get_clean();
+                    imagedestroy($dst);
                     return 'data:image/jpeg;base64,' . base64_encode($jpeg);
                 }
             }
@@ -237,11 +234,6 @@ class BulkIdCardController extends Controller
         }
     }
 
-    /**
-     * Generate a QR code PNG using pure GD — no Imagick required.
-     * BaconQrCode (already installed) provides the bit matrix;
-     * GD renders it to PNG.
-     */
     private function generateQrPngWithGd(string $content, int $targetSize = 120): string
     {
         $prevErrorLevel = error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);

@@ -47,11 +47,12 @@ class GenerateBulkIdCardsJob implements ShouldQueue
         ], now()->addHours(2));
 
         $logoBase64  = $this->encodeLogo();
-        $chunkPaths  = [];
-        $chunkSize   = 30; // campers per chunk PDF
+        $allCampers  = collect();
+        $chunkSize   = 50; // photo-encode in chunks to control peak memory
 
         try {
-            foreach ($this->camperIds->chunk($chunkSize) as $chunkIndex => $ids) {
+            // ── Phase 1: encode photos chunk-by-chunk to stay within memory ──
+            foreach ($this->camperIds->chunk($chunkSize) as $ids) {
                 $campers = Camper::with(['media', 'church.district', 'campRole'])
                     ->whereIn('id', $ids)
                     ->orderBy('church_id')
@@ -72,33 +73,34 @@ class GenerateBulkIdCardsJob implements ShouldQueue
                     }
                 });
 
-                $pages    = $campers->chunk(6);
-                $chunkPdf = Pdf::loadView('pdf.bulk-id-cards', [
-                    'pages'      => $pages,
-                    'totalCards' => $campers->count(),
-                    'logoBase64' => $logoBase64,
-                    'campName'   => setting('camp_name', 'Ogun Youth Camp'),
-                    'campYear'   => now()->year,
-                ])
-                    ->setPaper('a4', 'portrait')
-                    ->setOptions([
-                        'dpi'                  => 96,
-                        'isHtml5ParserEnabled' => false,
-                        'isRemoteEnabled'      => false,
-                        'isFontSubsettingEnabled' => true,
-                    ]);
-
-                $chunkPath = 'exports/chunks/' . $this->exportKey . '-chunk-' . $chunkIndex . '.pdf';
-                Storage::disk('local')->put($chunkPath, $chunkPdf->output());
-                $chunkPaths[] = $chunkPath;
-
-                // Free memory before next chunk
-                unset($campers, $chunkPdf, $pages);
+                $allCampers = $allCampers->concat($campers);
+                unset($campers);
                 gc_collect_cycles();
             }
 
-            // Merge chunks using Ghostscript if available, else use first chunk
-            $finalPath = $this->mergeChunks($chunkPaths);
+            // ── Phase 2: render ONE PDF with all campers — no merging needed ──
+            $pages = $allCampers->chunk(6);
+
+            $pdf = Pdf::loadView('pdf.bulk-id-cards', [
+                'pages'      => $pages,
+                'totalCards' => $allCampers->count(),
+                'logoBase64' => $logoBase64,
+                'campName'   => setting('camp_name', 'Ogun Youth Camp'),
+                'campYear'   => now()->year,
+            ])
+                ->setPaper('a4', 'portrait')
+                ->setOptions([
+                    'dpi'                     => 150,
+                    'isHtml5ParserEnabled'    => false,
+                    'isRemoteEnabled'         => false,
+                    'isFontSubsettingEnabled' => true,
+                ]);
+
+            $finalPath = 'exports/' . $this->exportKey . '-' . $this->filename;
+            Storage::disk('local')->put($finalPath, $pdf->output());
+
+            unset($pdf, $pages, $allCampers);
+            gc_collect_cycles();
 
             Cache::put("id_card_export:{$this->exportKey}", [
                 'status'       => 'done',
@@ -120,12 +122,6 @@ class GenerateBulkIdCardsJob implements ShouldQueue
                 'error'    => 'Export failed. Please try again with a smaller batch.',
                 'filename' => $this->filename,
             ], now()->addHours(1));
-
-        } finally {
-            // Always clean up chunk files
-            foreach ($chunkPaths as $path) {
-                Storage::disk('local')->delete($path);
-            }
         }
     }
 
@@ -134,12 +130,10 @@ class GenerateBulkIdCardsJob implements ShouldQueue
         $finalPath = 'exports/' . $this->exportKey . '-' . $this->filename;
 
         if (count($chunkPaths) === 1) {
-            // Only one chunk — just rename it
             Storage::disk('local')->move($chunkPaths[0], $finalPath);
             return $finalPath;
         }
 
-        // Try Ghostscript merge
         $fullPaths = array_map(fn ($p) => Storage::disk('local')->path($p), $chunkPaths);
         $output    = Storage::disk('local')->path($finalPath);
         $inputArgs = implode(' ', array_map('escapeshellarg', $fullPaths));
@@ -154,10 +148,10 @@ class GenerateBulkIdCardsJob implements ShouldQueue
             }
         }
 
-        // Ghostscript not available — return last chunk (best we can do without a merge library)
-        // A proper alternative is to install setasign/fpdi for PHP-native PDF merging
-        Log::info('bulk_id_cards.gs_unavailable', ['chunks' => count($chunkPaths)]);
-        Storage::disk('local')->move(array_pop($chunkPaths), $finalPath);
+        // Ghostscript unavailable — fall back to first chunk (largest, not last)
+        // Install setasign/fpdi for proper PHP-native PDF merging without Ghostscript
+        Log::warning('bulk_id_cards.gs_unavailable_using_first_chunk', ['chunks' => count($chunkPaths)]);
+        Storage::disk('local')->move(array_shift($chunkPaths), $finalPath);
         return $finalPath;
     }
 
@@ -175,22 +169,39 @@ class GenerateBulkIdCardsJob implements ShouldQueue
             $media = $c->getFirstMedia('photo');
             if (! $media) return null;
 
-            $path = ($media->hasGeneratedConversion('thumb') && file_exists($media->getPath('thumb')))
-                ? $media->getPath('thumb')
-                : $media->getPath();
-
+            // Always use the full-resolution original — thumb is too small for print
+            $path = $media->getPath();
             if (! file_exists($path)) return null;
 
             if (extension_loaded('gd')) {
-                $src = imagecreatefromstring(file_get_contents($path));
+                $src = @imagecreatefromstring(file_get_contents($path));
                 if ($src) {
-                    $thumb = imagecreatetruecolor(120, 120);
-                    imagecopyresampled($thumb, $src, 0, 0, 0, 0, 120, 120, imagesx($src), imagesy($src));
-                    ob_start();
-                    imagejpeg($thumb, null, 80);
-                    $jpeg = ob_get_clean();
+                    $srcW = imagesx($src);
+                    $srcH = imagesy($src);
+
+                    // Pre-crop to 19:24 (card photo box ratio) — top-centre crop
+                    // DomPDF ignores object-fit, so we crop in PHP to avoid distortion
+                    $targetRatio = 19 / 24;
+                    if ($srcW / $srcH > $targetRatio) {
+                        $cropH = $srcH;
+                        $cropW = (int) round($srcH * $targetRatio);
+                    } else {
+                        $cropW = $srcW;
+                        $cropH = (int) round($srcW / $targetRatio);
+                    }
+                    $cropX = (int) round(($srcW - $cropW) / 2);
+                    $cropY = (int) round(($srcH - $cropH) * 0.15); // bias toward top for faces
+
+                    $dst   = imagecreatetruecolor(426, 544);
+                    $white = imagecolorallocate($dst, 255, 255, 255);
+                    imagefill($dst, 0, 0, $white);
+                    imagecopyresampled($dst, $src, 0, 0, $cropX, $cropY, 426, 544, $cropW, $cropH);
                     imagedestroy($src);
-                    imagedestroy($thumb);
+
+                    ob_start();
+                    imagejpeg($dst, null, 92);
+                    $jpeg = ob_get_clean();
+                    imagedestroy($dst);
                     return 'data:image/jpeg;base64,' . base64_encode($jpeg);
                 }
             }

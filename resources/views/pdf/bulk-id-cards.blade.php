@@ -39,7 +39,7 @@
         .body-table { width: 49mm; margin: 2mm 3mm 0; border-collapse: collapse; }
         .photo-cell { width: 19mm; vertical-align: top; padding-right: 2mm; }
         .photo-box { width: 19mm; height: 24mm; border: 0.4pt solid #D1D5DB; overflow: hidden; background: #F9FAFB; }
-        .photo-box img { width: 19mm; height: 24mm; object-fit: cover; object-position: top center; display: block; }
+        .photo-box img { width: 19mm; height: 24mm; display: block; }
         .no-photo { width: 19mm; height: 24mm; font-size: 5pt; color: #9CA3AF; text-align: center; line-height: 24mm; }
         .info-cell { vertical-align: top; }
         .camper-name { font-size: 7pt; font-weight: bold; line-height: 1.2; word-break: break-word; margin-bottom: 0.8mm; }

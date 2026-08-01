@@ -52,8 +52,8 @@ class DocumentGenerationService
             'campYear'     => now()->year,
         ])->setPaper([0, 0, 153.07, 242.57], 'portrait')
             ->setOptions([
-                'dpi'                  => 150,
-                'isHtml5ParserEnabled' => true,
+                'dpi'                  => 300,
+                'isHtml5ParserEnabled' => false,
                 'isRemoteEnabled'      => false,
             ]);
 
@@ -221,8 +221,10 @@ class DocumentGenerationService
     /**
      * Encode the camper's photo as a base64 data URL for embedding in DomPDF.
      *
-     * Since RegistrationController now converts all uploads to JPEG before storage,
-     * both the original and thumb are always JPEG — no format detection needed.
+     * Uses the full-resolution original (never the thumb) and pre-crops it to
+     * the exact 18:23 ratio of the card's photo box before encoding. This avoids
+     * relying on CSS object-fit (unsupported by DomPDF) for cropping — DomPDF
+     * only needs to scale the image proportionally, which it does cleanly.
      */
     private function encodePhotoBase64(Camper $camper): string
     {
@@ -233,14 +235,7 @@ class DocumentGenerationService
             return '';
         }
 
-        // Prefer thumb (always JPEG, smaller file = faster PDF generation)
-        $path = $media->hasGeneratedConversion('thumb')
-            ? $media->getPath('thumb')
-            : $media->getPath();
-
-        if (! file_exists($path)) {
-            $path = $media->getPath();
-        }
+        $path = $media->getPath(); // always use full-resolution original
 
         if (! file_exists($path)) {
             Log::warning('encodePhotoBase64: no file on disk', [
@@ -251,6 +246,74 @@ class DocumentGenerationService
             return '';
         }
 
-        return 'data:image/jpeg;base64,' . base64_encode(file_get_contents($path));
+        return $this->cropAndResizePhotoForIdCard($path);
+    }
+
+    /**
+     * Crop and resize a photo to fit the ID card photo box (18mm × 23mm).
+     *
+     * DomPDF does not support object-fit: cover. Without pre-cropping, a portrait
+     * photo in a portrait box looks fine, but a landscape or square photo gets
+     * stretched/squashed — causing visible distortion and blur.
+     *
+     * Strategy:
+     * 1. Crop the source image to exactly the card ratio (18:23) from the centre,
+     *    favouring the top for face photos (top-centre crop, not true centre).
+     * 2. Resize the cropped area to 426 × 544 px (2× the 213 × 272 px display
+     *    size at 300 DPI). 2× gives DomPDF room to downsample sharply.
+     * 3. Output as JPEG quality 92.
+     */
+    private function cropAndResizePhotoForIdCard(string $sourcePath): string
+    {
+        $fallback = fn () => 'data:image/jpeg;base64,' . base64_encode(file_get_contents($sourcePath));
+
+        if (! extension_loaded('gd')) {
+            return $fallback();
+        }
+
+        $src = @imagecreatefromstring(file_get_contents($sourcePath));
+        if (! $src) {
+            return $fallback();
+        }
+
+        $srcW = imagesx($src);
+        $srcH = imagesy($src);
+
+        // Target ratio: 18mm wide × 23mm tall = 18/23
+        $targetRatio = 18 / 23; // ≈ 0.7826
+
+        // Determine crop dimensions that fit the target ratio within the source
+        if ($srcW / $srcH > $targetRatio) {
+            // Source is wider than target ratio — crop width, keep full height
+            $cropH = $srcH;
+            $cropW = (int) round($srcH * $targetRatio);
+        } else {
+            // Source is taller than target ratio — crop height, keep full width
+            $cropW = $srcW;
+            $cropH = (int) round($srcW / $targetRatio);
+        }
+
+        // Top-centre crop — centred horizontally, biased to top for face photos
+        $cropX = (int) round(($srcW - $cropW) / 2);
+        $cropY = (int) round(($srcH - $cropH) * 0.15); // 15% from top, not dead-centre
+
+        // Output at 2× the 300-DPI display size for crispness
+        $dstW = 426;
+        $dstH = 544;
+
+        $dst   = imagecreatetruecolor($dstW, $dstH);
+        $white = imagecolorallocate($dst, 255, 255, 255);
+        imagefill($dst, 0, 0, $white);
+
+        // imagecopyresampled = bicubic — smooth, sharp edges
+        imagecopyresampled($dst, $src, 0, 0, $cropX, $cropY, $dstW, $dstH, $cropW, $cropH);
+        imagedestroy($src);
+
+        ob_start();
+        imagejpeg($dst, null, 92);
+        $jpeg = ob_get_clean();
+        imagedestroy($dst);
+
+        return 'data:image/jpeg;base64,' . base64_encode($jpeg);
     }
 }
