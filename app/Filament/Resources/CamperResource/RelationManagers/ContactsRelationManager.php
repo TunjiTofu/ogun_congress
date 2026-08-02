@@ -5,6 +5,7 @@ namespace App\Filament\Resources\CamperResource\RelationManagers;
 use App\Enums\ContactType;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -18,32 +19,34 @@ class ContactsRelationManager extends RelationManager
     {
         return $form->schema([
             Forms\Components\Select::make('type')
-                ->options(collect(ContactType::cases())
-                    ->mapWithKeys(fn ($e) => [$e->value => $e->label()])
-                    ->toArray())
-                ->required(),
+                ->label('Contact Type')
+                ->options([
+                    'parent_guardian'   => 'Parent / Guardian',
+                    'emergency_contact' => 'Emergency Contact',
+                ])
+                ->required()
+                ->native(false),
 
             Forms\Components\TextInput::make('full_name')
+                ->label('Full Name')
                 ->required()
-                ->maxLength(191),
+                ->maxLength(255),
 
             Forms\Components\TextInput::make('relationship')
-                ->required()
-                ->maxLength(50)
-                ->placeholder('e.g. Mother, Pastor'),
+                ->label('Relationship')
+                ->placeholder('e.g. Mother, Father, Uncle')
+                ->maxLength(100),
 
             Forms\Components\TextInput::make('phone')
-                ->required()
+                ->label('Phone Number')
                 ->tel()
                 ->maxLength(20),
 
             Forms\Components\TextInput::make('email')
+                ->label('Email')
                 ->email()
-                ->maxLength(191),
-
-            Forms\Components\Toggle::make('is_primary')
-                ->label('Primary Contact'),
-        ]);
+                ->maxLength(255),
+        ])->columns(2);
     }
 
     public function table(Table $table): Table
@@ -51,24 +54,39 @@ class ContactsRelationManager extends RelationManager
         return $table
             ->columns([
                 Tables\Columns\BadgeColumn::make('type')
-                    ->formatStateUsing(fn ($state) => $state instanceof ContactType
-                        ? $state->label()
-                        : $state)
+                    ->formatStateUsing(fn ($state) => match (is_string($state) ? $state : $state?->value) {
+                        'parent_guardian'   => '👨‍👩‍👧 Parent / Guardian',
+                        'emergency_contact' => '🆘 Emergency Contact',
+                        default             => $state,
+                    })
                     ->colors([
-                        'info'    => ContactType::PARENT_GUARDIAN->value,
-                        'warning' => ContactType::EMERGENCY_CONTACT->value,
+                        'primary' => 'parent_guardian',
+                        'danger'  => 'emergency_contact',
                     ]),
 
-                Tables\Columns\TextColumn::make('full_name')->label('Name'),
-                Tables\Columns\TextColumn::make('relationship'),
-                Tables\Columns\TextColumn::make('phone')->copyable(),
-                Tables\Columns\TextColumn::make('email')->placeholder('—'),
-                Tables\Columns\IconColumn::make('is_primary')->boolean(),
+                Tables\Columns\TextColumn::make('full_name')
+                    ->label('Name')->weight('bold')->searchable(),
+
+                Tables\Columns\TextColumn::make('relationship')
+                    ->placeholder('—'),
+
+                Tables\Columns\TextColumn::make('phone')
+                    ->placeholder('—')->copyable(),
+
+                Tables\Columns\TextColumn::make('email')
+                    ->placeholder('—')->toggleable(),
             ])
-            ->headerActions([Tables\Actions\CreateAction::make()])
+            ->headerActions([
+                Tables\Actions\CreateAction::make()
+                    ->label('Add Contact')
+                    ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'secretariat'])),
+            ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'secretariat'])),
+
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn () => auth()->user()->hasRole('super_admin')),
             ]);
     }
 }
