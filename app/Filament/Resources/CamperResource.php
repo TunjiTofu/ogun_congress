@@ -325,8 +325,7 @@ class CamperResource extends Resource
                             ? Church::where('district_id', $get('district_id'))
                                 ->orderBy('name')->pluck('name', 'id')
                             : Church::orderBy('name')->pluck('name', 'id'))
-                        ->searchable()
-                        ->required(),
+                        ->searchable()->required(),
                     Forms\Components\Select::make('ministry')
                         ->label('Ministry')
                         ->options(fn () => \Illuminate\Support\Facades\DB::table('campers')
@@ -340,8 +339,7 @@ class CamperResource extends Resource
                         ->label('Club Rank')
                         ->options(fn () => \Illuminate\Support\Facades\DB::table('club_ranks')
                             ->orderBy('rank_name')->pluck('rank_name', 'rank_name')->toArray())
-                        ->searchable()
-                        ->placeholder('Select a rank'),
+                        ->searchable()->placeholder('Select a rank'),
                 ]),
 
             Forms\Components\Section::make('Additional Info')
@@ -352,12 +350,72 @@ class CamperResource extends Resource
                         ->label('Volunteer Role')
                         ->options(fn () => \Illuminate\Support\Facades\DB::table('camp_roles')
                             ->orderBy('name')->pluck('name', 'name')->toArray())
-                        ->searchable()
-                        ->placeholder('Select a camp role'),
+                        ->searchable()->placeholder('Select a camp role'),
                     Forms\Components\TextInput::make('badge_color')
                         ->label('Custom Badge Colour (hex)')->placeholder('#1B3A8F')
                         ->helperText('Overrides department colour on ID card. Leave blank for default.'),
                 ])->columns(2),
+
+            Forms\Components\Section::make('Parent / Guardian & Emergency Contacts')
+                ->visibleOn('edit')
+                ->schema([
+                    Forms\Components\Repeater::make('contacts')
+                        ->relationship('contacts')
+                        ->schema([
+                            Forms\Components\Select::make('type')
+                                ->label('Contact Type')
+                                ->options([
+                                    'parent_guardian'   => '👨‍👩‍👧 Parent / Guardian',
+                                    'emergency_contact' => '🆘 Emergency Contact',
+                                ])
+                                ->required()
+                                ->native(false)
+                                ->columnSpan(2),
+                            Forms\Components\TextInput::make('full_name')
+                                ->label('Full Name')
+                                ->required()
+                                ->columnSpan(2),
+                            Forms\Components\TextInput::make('relationship')
+                                ->label('Relationship')
+                                ->placeholder('e.g. Mother, Father, Uncle')
+                                ->columnSpan(2),
+                            Forms\Components\TextInput::make('phone')
+                                ->label('Phone Number')
+                                ->tel()
+                                ->columnSpan(2),
+                            Forms\Components\TextInput::make('email')
+                                ->label('Email Address')
+                                ->email()
+                                ->columnSpan(2),
+                        ])
+                        ->columns(2)
+                        ->itemLabel(fn (array $state): string =>
+                            ($state['full_name'] ?? 'New Contact')
+                            . (isset($state['type'])
+                                ? ' — ' . ($state['type'] === 'parent_guardian' ? 'Parent / Guardian' : 'Emergency Contact')
+                                : '')
+                        )
+                        ->addActionLabel('Add Contact')
+                        ->collapsible()
+                        ->defaultItems(0),
+                ]),
+
+            Forms\Components\Section::make('Health & Medical')
+                ->visibleOn('edit')
+                ->visible(fn () => auth()->user()->hasRole('super_admin'))
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Textarea::make('health_medical_conditions')
+                        ->label('Medical Conditions')->rows(2)->columnSpanFull(),
+                    Forms\Components\Textarea::make('health_medications')
+                        ->label('Current Medications')->rows(2)->columnSpanFull(),
+                    Forms\Components\Textarea::make('health_allergies')
+                        ->label('Allergies')->rows(2)->columnSpanFull(),
+                    Forms\Components\TextInput::make('health_doctor_name')
+                        ->label('Doctor / Physician Name'),
+                    Forms\Components\TextInput::make('health_doctor_phone')
+                        ->label('Doctor Phone'),
+                ]),
 
             Forms\Components\Section::make('Consent')
                 ->visibleOn('edit')
@@ -537,51 +595,31 @@ class CamperResource extends Resource
                         Forms\Components\Select::make('district_id')
                             ->label('District (optional)')
                             ->options(District::orderBy('name')->pluck('name', 'id'))
-                            ->live()
-                            ->afterStateUpdated(fn (Forms\Set $set) => $set('church_id', null))
-                            ->placeholder('All districts')
-                            ->nullable(),
+                            ->live()->afterStateUpdated(fn (Forms\Set $set) => $set('church_id', null))
+                            ->placeholder('All districts')->nullable(),
                         Forms\Components\Select::make('church_id')
                             ->label('Local Church (optional)')
                             ->options(fn (Get $get) => $get('district_id')
-                                ? Church::where('district_id', $get('district_id'))
-                                    ->orderBy('name')->pluck('name', 'id')
+                                ? Church::where('district_id', $get('district_id'))->orderBy('name')->pluck('name', 'id')
                                 : Church::orderBy('name')->pluck('name', 'id'))
-                            ->searchable()
-                            ->placeholder('All churches')
-                            ->nullable(),
+                            ->searchable()->placeholder('All churches')->nullable(),
                         Forms\Components\Select::make('category')
                             ->label('Department (optional)')
                             ->options(collect(CamperCategory::cases())
                                 ->mapWithKeys(fn ($e) => [$e->value => $e->label()])->toArray())
-                            ->placeholder('All departments')
-                            ->nullable(),
+                            ->placeholder('All departments')->nullable(),
                     ])
                     ->action(function (array $data) {
                         $query = \App\Models\Camper::query();
                         if (! empty($data['district_id'])) {
-                            $churchIds = Church::where('district_id', $data['district_id'])->pluck('id');
-                            $query->whereIn('church_id', $churchIds);
+                            $query->whereIn('church_id', Church::where('district_id', $data['district_id'])->pluck('id'));
                         }
-                        if (! empty($data['church_id'])) {
-                            $query->where('church_id', $data['church_id']);
-                        }
-                        if (! empty($data['category'])) {
-                            $query->where('category', $data['category']);
-                        }
-                        $ids   = $query->pluck('id');
-                        $count = $ids->count();
-                        if ($count === 0) {
-                            Notification::make()->title('No campers matched the selected filters.')->warning()->send();
-                            return;
-                        }
-                        foreach ($ids as $id) {
-                            \App\Jobs\GenerateCamperDocumentsJob::dispatch($id)->onQueue('documents');
-                        }
-                        Notification::make()
-                            ->title("Queued {$count} camper(s) for document regeneration.")
-                            ->body('ID cards and consent forms will be regenerated in the background.')
-                            ->success()->send();
+                        if (! empty($data['church_id']))  $query->where('church_id', $data['church_id']);
+                        if (! empty($data['category']))   $query->where('category', $data['category']);
+                        $ids = $query->pluck('id');
+                        if ($ids->isEmpty()) { Notification::make()->title('No campers matched.')->warning()->send(); return; }
+                        foreach ($ids as $id) { \App\Jobs\GenerateCamperDocumentsJob::dispatch($id)->onQueue('documents'); }
+                        Notification::make()->title("{$ids->count()} camper(s) queued.")->body('Regenerating in background.')->success()->send();
                     }),
             ])
             ->actions([
