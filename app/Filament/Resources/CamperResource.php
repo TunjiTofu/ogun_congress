@@ -203,6 +203,7 @@ class CamperResource extends Resource
                                 ->icon('heroicon-o-arrow-down-tray')
                                 ->url(fn (Camper $record) => $record->id_card_path
                                     ? route('documents.download', base64_encode($record->id_card_path))
+                                    . '?v=' . @filemtime(\Illuminate\Support\Facades\Storage::disk('private')->path($record->id_card_path))
                                     : null)
                                 ->openUrlInNewTab()
                                 ->visible(fn (Camper $record) => (bool) $record->id_card_path)
@@ -221,6 +222,7 @@ class CamperResource extends Resource
                                 ->icon('heroicon-o-arrow-down-tray')
                                 ->url(fn (Camper $record) => $record->consent_form_path
                                     ? route('documents.download', base64_encode($record->consent_form_path))
+                                    . '?v=' . @filemtime(\Illuminate\Support\Facades\Storage::disk('private')->path($record->consent_form_path))
                                     : null)
                                 ->openUrlInNewTab()
                                 ->visible(fn (Camper $record) => (bool) $record->consent_form_path)
@@ -539,7 +541,6 @@ class CamperResource extends Resource
                             ->afterStateUpdated(fn (Forms\Set $set) => $set('church_id', null))
                             ->placeholder('All districts')
                             ->nullable(),
-
                         Forms\Components\Select::make('church_id')
                             ->label('Local Church (optional)')
                             ->options(fn (Get $get) => $get('district_id')
@@ -549,7 +550,6 @@ class CamperResource extends Resource
                             ->searchable()
                             ->placeholder('All churches')
                             ->nullable(),
-
                         Forms\Components\Select::make('category')
                             ->label('Department (optional)')
                             ->options(collect(CamperCategory::cases())
@@ -559,34 +559,25 @@ class CamperResource extends Resource
                     ])
                     ->action(function (array $data) {
                         $query = \App\Models\Camper::query();
-
                         if (! empty($data['district_id'])) {
                             $churchIds = Church::where('district_id', $data['district_id'])->pluck('id');
                             $query->whereIn('church_id', $churchIds);
                         }
-
                         if (! empty($data['church_id'])) {
                             $query->where('church_id', $data['church_id']);
                         }
-
                         if (! empty($data['category'])) {
                             $query->where('category', $data['category']);
                         }
-
                         $ids   = $query->pluck('id');
                         $count = $ids->count();
-
                         if ($count === 0) {
-                            Notification::make()
-                                ->title('No campers matched the selected filters.')
-                                ->warning()->send();
+                            Notification::make()->title('No campers matched the selected filters.')->warning()->send();
                             return;
                         }
-
                         foreach ($ids as $id) {
                             \App\Jobs\GenerateCamperDocumentsJob::dispatch($id)->onQueue('documents');
                         }
-
                         Notification::make()
                             ->title("Queued {$count} camper(s) for document regeneration.")
                             ->body('ID cards and consent forms will be regenerated in the background.')
