@@ -20,7 +20,7 @@
                 </div>
             </td>
             <td class="info-cell">
-                <div class="camper-name" style="color:{{ $badgeColor }}">{{ $camper->full_name }}</div>
+                <div class="camper-name" style="color:{{ $badgeColor }}">{{ ucwords(strtolower($camper->full_name)) }}</div>
                 <div class="camper-code">{{ $camper->camper_number }}</div>
 
                 {{-- Dept · Rank on same line --}}
