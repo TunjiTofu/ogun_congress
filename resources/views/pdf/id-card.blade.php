@@ -26,7 +26,10 @@
         .body-table { width: 50mm; margin: 1.5mm 2mm 0; border-collapse: collapse; }
         .photo-cell { width: 18mm; vertical-align: top; padding-right: 2mm; }
         .photo-box { width: 18mm; height: 23mm; border: 0.4pt solid #D1D5DB; overflow: hidden; background: #F9FAFB; }
-        .photo-box img { width: 18mm; height: 23mm; object-fit: cover; object-position: top center; display: block; }
+        /* object-fit removed — DomPDF does not support it.
+           Photo is pre-cropped to 18:23 ratio in PHP (cropAndResizePhotoForIdCard),
+           so DomPDF only needs to scale it proportionally — no distortion. */
+        .photo-box img { width: 18mm; height: 23mm; display: block; }
         .no-photo { width: 18mm; height: 23mm; font-size: 5pt; color: #9CA3AF; text-align: center; line-height: 23mm; }
         .info-cell { vertical-align: top; }
 
@@ -63,7 +66,6 @@
 </head>
 <body>
 <div class="card">
-
     <div class="top-band" style="background:{{ $badgeColor }}">
         <table><tr>
                 <td>
