@@ -10,6 +10,7 @@ use App\Models\District;
 use App\Models\OfflinePayment;
 use App\Models\ProgrammeSession;
 use App\Models\RegistrationCode;
+use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\HtmlString;
@@ -32,12 +33,22 @@ class Dashboard extends BaseDashboard
         }
 
         return [
-            \Filament\Actions\Action::make('export_management_report')
+            Action::make('export_management_report')
                 ->label('Export Management Report')
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('gray')
                 ->url(route('exports.management-report'))
                 ->openUrlInNewTab(false),
+
+            Action::make('export_health')
+                ->label('Health Report PDF')
+                ->icon('heroicon-o-heart')
+                ->color('gray')
+                ->visible(fn () => auth()->user()->hasAnyRole(['super_admin', 'admin']))
+                ->url(route('exports.health-report'))
+                ->openUrlInNewTab(),
+
+
         ];
     }
 

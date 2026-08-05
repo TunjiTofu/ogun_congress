@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BulkIdCardController;
 use App\Http\Controllers\CamperExportController;
+use App\Http\Controllers\HealthReportController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\RejectedPhotosExportController;
@@ -196,6 +197,8 @@ Route::middleware(['auth'])->prefix('exports')->name('exports.')->group(function
     ->name('rejected-photos');
     Route::get('skill-registrations', [SkillRegistrationExportController::class, 'export'])
         ->name('skill-registrations');
+    Route::get('health-report', [HealthReportController::class, 'export'])
+        ->name('health-report');
 });
 
 // ── Registration downloads API (polled by success page) ──────────────────────
