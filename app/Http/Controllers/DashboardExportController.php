@@ -40,6 +40,7 @@ class DashboardExportController extends Controller
         $tshirtByDeptDistrict    = $this->gatherTshirtByDeptDistrict();
         $unclaimedByChurch       = $this->gatherUnclaimedByChurch();
         $tshirtByDept            = $this->gatherTshirtByDept();
+        $genderByDistrict        = $this->gatherGenderByDistrict(); // ← new
         $logoBase64              = $this->logoBase64();
         $campVenue               = setting('camp_venue', 'Abeokuta');
         $campDates               = setting('camp_dates', 'Aug 16–22, 2026');
@@ -47,7 +48,7 @@ class DashboardExportController extends Controller
         $html = view('pdf.management-report', compact(
             'stats', 'byChurch', 'tshirtSizes',
             'tshirtByDistrictChurch', 'tshirtByDeptDistrict',
-            'unclaimedByChurch', 'tshirtByDept',
+            'unclaimedByChurch', 'tshirtByDept', 'genderByDistrict',
             'logoBase64', 'campVenue', 'campDates'
         ))->render();
 
@@ -91,16 +92,9 @@ class DashboardExportController extends Controller
         $offlinePaymentsRejected  = OfflinePayment::where('status', 'rejected')->count();
         $confirmedPayments        = $onlinePayments + $offlinePaymentsConfirmed;
 
-        // Revenue from completed registrations (CLAIMED codes)
         $claimedRevenue = (int) RegistrationCode::where('status', 'CLAIMED')->sum('amount_paid');
-
-        // Revenue from confirmed payments where registration is not yet complete (ACTIVE codes)
-        $activeRevenue = (int) RegistrationCode::where('status', 'ACTIVE')->sum('amount_paid');
-
-        // Total confirmed revenue = claimed + active (both are paid and confirmed)
-        $totalRevenue = $claimedRevenue + $activeRevenue;
-
-        // Pending revenue: offline payments awaiting finance approval
+        $activeRevenue  = (int) RegistrationCode::where('status', 'ACTIVE')->sum('amount_paid');
+        $totalRevenue   = $claimedRevenue + $activeRevenue;
         $pendingRevenue = (int) OfflinePayment::where('status', 'pending')->sum('amount');
 
         $consentOutstanding = Camper::whereIn('category', ['adventurer', 'pathfinder'])->where('consent_collected', false)->count();
@@ -167,6 +161,40 @@ class DashboardExportController extends Controller
         return array_values($byChurch);
     }
 
+    // ── Gender by District & Church ───────────────────────────────────────────
+
+    private function gatherGenderByDistrict(): array
+    {
+        $rows = Camper::with('church.district')
+            ->selectRaw('church_id, gender, COUNT(*) as cnt')
+            ->groupBy('church_id', 'gender')
+            ->get();
+
+        $byDistrict = [];
+        foreach ($rows as $r) {
+            $district = $r->church?->district?->name ?? 'Unknown';
+            $church   = $r->church?->name ?? 'Unknown';
+            $gender   = is_string($r->gender) ? $r->gender : ($r->gender?->value ?? 'unknown');
+
+            $byDistrict[$district] ??= ['district' => $district, 'male' => 0, 'female' => 0, 'churches' => []];
+            if ($gender === 'male')   $byDistrict[$district]['male']   += $r->cnt;
+            if ($gender === 'female') $byDistrict[$district]['female'] += $r->cnt;
+
+            $byDistrict[$district]['churches'][$church] ??= ['church' => $church, 'male' => 0, 'female' => 0];
+            if ($gender === 'male')   $byDistrict[$district]['churches'][$church]['male']   += $r->cnt;
+            if ($gender === 'female') $byDistrict[$district]['churches'][$church]['female'] += $r->cnt;
+        }
+
+        ksort($byDistrict);
+        foreach ($byDistrict as &$d) {
+            ksort($d['churches']);
+            $d['churches'] = array_values($d['churches']);
+            $d['total']    = $d['male'] + $d['female'];
+        }
+
+        return array_values($byDistrict);
+    }
+
     // ── T-Shirt overall ───────────────────────────────────────────────────────
 
     private function gatherTshirtSizes(): array
@@ -213,7 +241,6 @@ class DashboardExportController extends Controller
             ->groupBy('church_id', 'category', 'tshirt_size')
             ->get();
 
-        // Structure: [ district => [ church => [ category => [ size => count ] ] ] ]
         $result = [];
         foreach ($rows as $r) {
             $district = $r->church?->district?->name ?? 'Unknown';
@@ -240,7 +267,6 @@ class DashboardExportController extends Controller
             ->groupBy('category', 'tshirt_size')
             ->get();
 
-        // Structure: [ category_value => [ size => count ] ]
         $result = [];
         foreach ($rows as $r) {
             $catKey = $r->category instanceof \App\Enums\CamperCategory
