@@ -40,7 +40,8 @@ class DashboardExportController extends Controller
         $tshirtByDeptDistrict    = $this->gatherTshirtByDeptDistrict();
         $unclaimedByChurch       = $this->gatherUnclaimedByChurch();
         $tshirtByDept            = $this->gatherTshirtByDept();
-        $genderByDistrict        = $this->gatherGenderByDistrict(); // ← new
+        $genderByDistrict        = $this->gatherGenderByDistrict();
+        $officialsTshirts        = $this->gatherOfficialsTshirts();
         $logoBase64              = $this->logoBase64();
         $campVenue               = setting('camp_venue', 'Abeokuta');
         $campDates               = setting('camp_dates', 'Aug 16–22, 2026');
@@ -49,6 +50,7 @@ class DashboardExportController extends Controller
             'stats', 'byChurch', 'tshirtSizes',
             'tshirtByDistrictChurch', 'tshirtByDeptDistrict',
             'unclaimedByChurch', 'tshirtByDept', 'genderByDistrict',
+            'officialsTshirts',
             'logoBase64', 'campVenue', 'campDates'
         ))->render();
 
@@ -195,11 +197,51 @@ class DashboardExportController extends Controller
         return array_values($byDistrict);
     }
 
-    // ── T-Shirt overall ───────────────────────────────────────────────────────
+    // ── Officials T-Shirt ─────────────────────────────────────────────────────
+
+    private function gatherOfficialsTshirts(): array
+    {
+        $officials = Camper::with(['campRole', 'church.district'])
+            ->where('is_official', true)
+            ->whereNotNull('camp_role_id')
+            ->orderBy('full_name')
+            ->get()
+            ->map(fn ($c) => [
+                'name'       => ucwords(strtolower($c->full_name ?? '')),
+                'role'       => $c->campRole?->name ?? '—',
+                'tshirt'     => $c->tshirt_size ?? '—',
+                'church'     => $c->church?->name ?? '—',
+                'district'   => $c->church?->district?->name ?? '—',
+            ]);
+
+        $summary = $officials
+            ->where('tshirt', '!=', '—')
+            ->groupBy('tshirt')
+            ->map->count()
+            ->toArray();
+
+        return [
+            'list'    => $officials->toArray(),
+            'summary' => $summary,
+            'count'   => $officials->count(),
+        ];
+    }
+
+    // ── Scope: exclude officials from general T-shirt counts ──────────────────
+
+    private function nonOfficialScope($query)
+    {
+        return $query->where(fn ($q) =>
+        $q->where('is_official', false)->orWhereNull('camp_role_id')
+        );
+    }
+
+    // ── T-Shirt overall (non-officials only) ─────────────────────────────────
 
     private function gatherTshirtSizes(): array
     {
-        return Camper::selectRaw('tshirt_size, COUNT(*) as count')
+        return $this->nonOfficialScope(Camper::query())
+            ->selectRaw('tshirt_size, COUNT(*) as count')
             ->whereNotNull('tshirt_size')
             ->groupBy('tshirt_size')
             ->orderByRaw("FIELD(tshirt_size,'XS','S','M','L','XL','XXL','XXXL')")
@@ -212,7 +254,7 @@ class DashboardExportController extends Controller
 
     private function gatherTshirtByDistrictChurch(): array
     {
-        $rows = Camper::with('church.district')
+        $rows = $this->nonOfficialScope(Camper::with('church.district'))
             ->selectRaw('church_id, tshirt_size, COUNT(*) as cnt')
             ->whereNotNull('tshirt_size')
             ->groupBy('church_id', 'tshirt_size')
@@ -235,7 +277,7 @@ class DashboardExportController extends Controller
 
     private function gatherTshirtByDeptDistrict(): array
     {
-        $rows = Camper::with('church.district')
+        $rows = $this->nonOfficialScope(Camper::with('church.district'))
             ->selectRaw('church_id, category, tshirt_size, COUNT(*) as cnt')
             ->whereNotNull('tshirt_size')
             ->groupBy('church_id', 'category', 'tshirt_size')
@@ -262,7 +304,8 @@ class DashboardExportController extends Controller
 
     private function gatherTshirtByDept(): array
     {
-        $rows = Camper::selectRaw('category, tshirt_size, COUNT(*) as cnt')
+        $rows = $this->nonOfficialScope(Camper::query())
+            ->selectRaw('category, tshirt_size, COUNT(*) as cnt')
             ->whereNotNull('tshirt_size')
             ->groupBy('category', 'tshirt_size')
             ->get();
