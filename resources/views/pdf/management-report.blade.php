@@ -402,9 +402,25 @@
 <div class="page-break"></div>
 <div class="sh">
     <span class="sh-num">04 &nbsp;/&nbsp; Logistics</span>
-    <span class="sh-title">T-Shirt Size Orders</span>
+    <span class="sh-title">T-Shirt Size Orders &#8212; General Campers</span>
     <span class="sh-desc">Overall distribution, by department, and breakdown by district &amp; church.</span>
     <hr class="sh-rule"/>
+</div>
+
+@php
+    $officialCount     = $officialsTshirts['count'];
+    $generalShirtTotal = array_sum(array_column($tshirtSizes, 'count'));
+    $grandShirtTotal   = $generalShirtTotal + $officialCount;
+@endphp
+
+<div class="note-box">
+    &#9432; <strong>Note:</strong>
+    Camp officials (<strong>{{ $officialCount }}</strong> persons with an assigned role) have been extracted from
+    the tables below and are shown separately in the <em>Camp Officials T-Shirt</em> section on the next page.
+    <br/>
+    General campers: <strong>{{ number_format($generalShirtTotal) }}</strong>
+    &nbsp;+&nbsp; Camp officials: <strong>{{ $officialCount }}</strong>
+    &nbsp;= Total registered: <strong>{{ number_format($grandShirtTotal) }}</strong>
 </div>
 
 <div class="ssub">Overall Distribution</div>
@@ -447,7 +463,7 @@
                 </tr>
             @endforeach
             </tbody>
-            <tfoot><tr><td>Grand Total</td>@foreach($deptSizeActive as $sz)<td class="c n" style="align-items: center">{{ $grandSzTotals[$sz]??0 }}</td>@endforeach<td class="n">{{ number_format($totalShirts) }}</td></tr></tfoot>
+            <tfoot><tr><td>Grand Total</td>@foreach($deptSizeActive as $sz)<td class="c n">{{ $grandSzTotals[$sz]??0 }}</td>@endforeach<td class="n">{{ number_format($totalShirts) }}</td></tr></tfoot>
         </table>
     </div>
 @endif
@@ -484,10 +500,102 @@
     </div>
 @endif
 
-{{-- ═══ PAGE 6 — DISTRICT REGISTRATION ══════════════════════ --}}
+{{-- ═══ PAGE 6 — OFFICIALS T-SHIRT ════════════════════════ --}}
 <div class="page-break"></div>
 <div class="sh">
-    <span class="sh-num">05 &nbsp;/&nbsp; District Report</span>
+    <span class="sh-num">05b &nbsp;/&nbsp; Logistics</span>
+    <span class="sh-title">Camp Officials T-Shirt Orders</span>
+    <span class="sh-desc">Officials are defined as campers assigned a camp role.</span>
+    <hr class="sh-rule"/>
+</div>
+
+@php $allSzOrder = ['XS','S','M','L','XL','XXL','XXXL']; @endphp
+
+{{-- Size summary --}}
+@if(!empty($officialsTshirts['summary']))
+    <div class="ssub">Size Summary &#8212; Officials Only</div>
+    <div class="tbl-outer" style="margin-bottom:7mm">
+        <table class="dt">
+            <thead>
+            <tr>
+                @foreach($allSzOrder as $sz)
+                    @if(isset($officialsTshirts['summary'][$sz]))
+                        <th class="c">{{ $sz }}</th>
+                    @endif
+                @endforeach
+                <th class="r">Total Officials</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                @foreach($allSzOrder as $sz)
+                    @if(isset($officialsTshirts['summary'][$sz]))
+                        <td class="c n">{{ $officialsTshirts['summary'][$sz] }}</td>
+                    @endif
+                @endforeach
+                <td class="n" style="color:#C9993A">{{ $officialsTshirts['count'] }}</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+@endif
+
+{{-- Reconciliation note --}}
+<div class="note-box">
+    &#10003; <strong>Reconciliation:</strong>
+    General campers: <strong>{{ number_format($generalShirtTotal) }}</strong>
+    &nbsp;+&nbsp; Camp officials: <strong>{{ $officialsTshirts['count'] }}</strong>
+    &nbsp;= <strong>{{ number_format($grandShirtTotal) }}</strong> total registered.
+</div>
+
+{{-- Officials grouped by role --}}
+@if(!empty($officialsTshirts['list']))
+    @php
+        // Group officials by role, sorted alphabetically
+        $officialsByRole = collect($officialsTshirts['list'])
+            ->groupBy('role')
+            ->sortKeys();
+    @endphp
+
+    @foreach($officialsByRole as $roleName => $members)
+        <div class="ssub">{{ $roleName }} <span style="font-size:6.5pt;font-weight:normal;text-transform:none;letter-spacing:0;color:#6B7280">({{ $members->count() }} {{ $members->count() === 1 ? 'member' : 'members' }})</span></div>
+        <div class="tbl-outer" style="margin-bottom:6mm">
+            <table class="dt">
+                <thead>
+                <tr>
+                    <th width="40%">Name</th>
+                    <th width="28%">Church</th>
+                    <th width="18%">District</th>
+                    <th class="c" width="14%">T-Shirt</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach($members->sortBy('name') as $official)
+                    <tr>
+                        <td style="font-weight:bold">{{ $official['name'] }}</td>
+                        <td class="mu">{{ $official['church'] }}</td>
+                        <td class="mu">{{ $official['district'] }}</td>
+                        <td class="c n">{{ $official['tshirt'] }}</td>
+                    </tr>
+                @endforeach
+                </tbody>
+                <tfoot>
+                <tr>
+                    <td colspan="3">{{ $roleName }} &#8212; Subtotal</td>
+                    <td class="n">{{ $members->count() }}</td>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+    @endforeach
+@else
+    <div class="note-box">No camp officials with assigned roles found.</div>
+@endif
+
+{{-- ═══ PAGE 7 — DISTRICT REGISTRATION ══════════════════════ --}}
+<div class="page-break"></div>
+<div class="sh">
+    <span class="sh-num">06 &nbsp;/&nbsp; District Report</span>
     <span class="sh-title">Registration by District &amp; Church</span>
     <span class="sh-desc">Full breakdown per church with district subtotals. &nbsp;Adv = Adventurers &nbsp;&#183;&nbsp; PF = Pathfinders &nbsp;&#183;&nbsp; SYL = Senior Youth.</span>
     <hr class="sh-rule"/>
