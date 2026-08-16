@@ -564,12 +564,22 @@
 <!-- ── PROGRAMMES — only during camp ─────────────────────────────────────── -->
 @if($campActive)
     @php
-        $advProg = Cache::remember('prog_adv', 3600, fn() =>
-            json_decode(file_get_contents(storage_path('app/programmes/adventurer-programme.json')), true));
-        $pfProg  = Cache::remember('prog_pf',  3600, fn() =>
-            json_decode(file_get_contents(storage_path('app/programmes/pathfinder-programme.json')), true));
-        $sylProg = Cache::remember('prog_syl', 3600, fn() =>
-            json_decode(file_get_contents(storage_path('app/programmes/senior-youth-programme.json')), true));
+        $loadProg = function (string $filename): array {
+            $path = storage_path('app/programmes/' . $filename);
+            if (! file_exists($path)) {
+                return ['days' => []];
+            }
+            try {
+                $data = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+                return is_array($data) ? $data : ['days' => []];
+            } catch (\Throwable $e) {
+                return ['days' => []];
+            }
+        };
+
+        $advProg = Cache::remember('prog_adv', 3600, fn() => $loadProg('adventurer-programme.json'));
+        $pfProg  = Cache::remember('prog_pf',  3600, fn() => $loadProg('pathfinder-programme.json'));
+        $sylProg = Cache::remember('prog_syl', 3600, fn() => $loadProg('senior-youth-programme.json'));
     @endphp
     <section id="programs" style="background:var(--cream);padding:120px 0;border-top:1px solid var(--rule)">
         <div class="container">
